@@ -2,11 +2,14 @@ import time
 import librosa
 import matplotlib
 import numpy as np
+from tqdm import tqdm
 
 from matplotlib import pyplot as plt
 from scipy import signal
 
 matplotlib.use('TkAgg')
+plt.figure()
+plt.close()
 
 FIGURE_SIZE = (10, 10)
 
@@ -26,25 +29,22 @@ class SignalLoader:
         self.segment_duration = segment_duration
         self.song_name = name
         self._number_segments = 0
-        self.start_time = 0
-        self.stop_time = 0
 
     def __enter__(self):
         """
         Generator for creating a set of segments from a song.
         :return: song segment
         """
-        self.start_time = time.time()
-        print(f"+ creating segments for {self.song_name}")
         segment_length = self.sr * self.segment_duration
-        for s in range(0, len(self.wave), segment_length):
-            t = self.wave[s: s + segment_length]
+        for segment in tqdm(range(0, len(self.wave), segment_length), colour="green", desc="Segmenting"):
+            wav = self.wave[segment: segment + segment_length]
+            # padding the array with zeros if the wav form wav doesn't match the segment length
+            if len(wav) != segment_length:
+                wav = np.pad(wav, (0, segment_length - len(wav)))
             self._number_segments += 1
-            yield t
+            yield wav
 
     def __exit__(self, type, value, traceback):
-        self.stop_time = time.time()
-        print(f"* created {self._number_segments} segments in {self.stop_time-self.start_time:.2f} seconds")
         pass
 
 def STFT(wave: np.ndarray, sr: float, path: str) -> None:
@@ -56,7 +56,12 @@ def STFT(wave: np.ndarray, sr: float, path: str) -> None:
     :param path: output path
     """
 
-    f, t, Zxx = signal.stft(wave, fs=sr)
+    # if the length of the wav is smaller than the window function, stop
+    nperseg = 256
+    if len(wave) < nperseg:
+        return
+
+    f, t, Zxx = signal.stft(wave, fs=sr, nperseg=nperseg)
 
     path = path.replace("FUNC", "STFT")
 
@@ -65,7 +70,7 @@ def STFT(wave: np.ndarray, sr: float, path: str) -> None:
     plt.pcolormesh(t, f, np.abs(Zxx), shading='gouraud')
     plt.ylim(0, 5000)
     plt.axis("off")
-    plt.savefig(path)
+    plt.savefig(path, bbox_inches="tight", pad_inches=0)
     plt.close()
 
 def MEL_SPEC(wave: np.ndarray, sr: float, path: str) -> None:
@@ -76,7 +81,13 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path: str) -> None:
     :param sr: sample rate
     :param path: output path
     """
-    mel_spectrogram = librosa.feature.melspectrogram(y=wave, sr=sr, n_fft=2048, hop_length=512, n_mels=128)
+
+    # if the length of the wav is smaller than the window function, stop
+    n_fft = 2048
+    if len(wave) < n_fft:
+        return
+
+    mel_spectrogram = librosa.feature.melspectrogram(y=wave, sr=sr, n_fft=n_fft, hop_length=512, n_mels=128)
     mel_spectrogram_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
 
     path = path.replace("FUNC", "MEL_SPEC")
@@ -85,7 +96,7 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path: str) -> None:
     plt.figure(figsize=FIGURE_SIZE)
     librosa.display.specshow(mel_spectrogram_db, sr=sr, hop_length=512, x_axis='time', y_axis='mel')
     plt.axis("off")
-    plt.savefig(path)
+    plt.savefig(path, bbox_inches="tight", pad_inches=0)
     plt.close()
 
 

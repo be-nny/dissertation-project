@@ -1,10 +1,11 @@
+import os
+
 from preprocessor import preprocessor as p
 from preprocessor import signal_processor as sp
-from preprocessor import utils
+from dotenv import load_dotenv
 
-preprocessor = p.Preprocessor(segment_duration=30).set_signal_filters(sp.STFT, sp.MEL_SPEC)
+dotenv_path = "config.env"
+load_dotenv(dotenv_path=dotenv_path)
+dataset_path = os.getenv("DATASET_PATH")
 
-path = "test_files/audio_2.mp3"
-print(utils.get_song_metadata(path=path))
-
-preprocessor.process(path=path)
+preprocessor = p.Preprocessor(dataset_dir=dataset_path, segment_duration=15).set_signal_filters(sp.STFT, sp.MEL_SPEC).preprocess()
