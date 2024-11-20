@@ -1,4 +1,3 @@
-import time
 import librosa
 import matplotlib
 import numpy as np
@@ -14,7 +13,7 @@ plt.close()
 FIGURE_SIZE = (10, 10)
 
 class SignalLoader:
-    def __init__(self, wave: np.ndarray, sr: float, name: str, segment_duration=10):
+    def __init__(self, wave: np.ndarray, sr: float, segment_duration=10):
         """
         Create a Signal Loader Context to create a set of segments from a song.
 
@@ -27,7 +26,6 @@ class SignalLoader:
         self.wave = wave
         self.sr = sr
         self.segment_duration = segment_duration
-        self.song_name = name
         self._number_segments = 0
 
     def __enter__(self):
@@ -47,7 +45,7 @@ class SignalLoader:
     def __exit__(self, type, value, traceback):
         pass
 
-def STFT(wave: np.ndarray, sr: float, path: str) -> None:
+def STFT(wave: np.ndarray, sr: float, path: str, debug=False) -> None:
     """
     Create a Short Time Fourier Transform for a waveform
 
@@ -69,11 +67,17 @@ def STFT(wave: np.ndarray, sr: float, path: str) -> None:
     plt.figure(figsize=FIGURE_SIZE)
     plt.pcolormesh(t, f, np.abs(Zxx), shading='gouraud')
     plt.ylim(0, 5000)
-    plt.axis("off")
+
+    if not debug:
+        plt.axis("off")
+    else:
+        plt.title(f"Example STFT Graph")
+        plt.colorbar(format="%+2.0f dB")
+
     plt.savefig(path, bbox_inches="tight", pad_inches=0)
     plt.close()
 
-def MEL_SPEC(wave: np.ndarray, sr: float, path: str) -> None:
+def MEL_SPEC(wave: np.ndarray, sr: float, path: str, debug=False) -> None:
     """
     Create a Mel Spectrogram for a waveform
 
@@ -95,16 +99,21 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path: str) -> None:
     # Plot the Mel spectrogram
     plt.figure(figsize=FIGURE_SIZE)
     librosa.display.specshow(mel_spectrogram_db, sr=sr, hop_length=512, x_axis='time', y_axis='mel')
-    plt.axis("off")
+    if not debug:
+        plt.axis("off")
+    else:
+        plt.title(f"Example MEL_SPEC Graph")
+        plt.colorbar(format="%+2.0f dB")
+
     plt.savefig(path, bbox_inches="tight", pad_inches=0)
     plt.close()
 
 
-def CQT(wav: np.ndarray, sr: float, path: str):
+def CQT(wav: np.ndarray, sr: float, path: str, debug=False):
     """
     Generate the constant-Q transform of an audio signal
 
-    :param wave: raw audio data
+    :param wav: raw audio data
     :param sr: sample rate
     :param path: output path
     """
@@ -113,6 +122,11 @@ def CQT(wav: np.ndarray, sr: float, path: str):
     C = np.abs(librosa.cqt(wav, sr=sr))
     plt.figure(figsize=FIGURE_SIZE)
     librosa.display.specshow(librosa.amplitude_to_db(C, ref=np.max), sr=sr, x_axis='time', y_axis='cqt_note')
-    plt.axis("off")
+    if not debug:
+        plt.axis("off")
+    else:
+        plt.title(f"Example CQT Graph")
+        plt.colorbar(format="%+2.0f dB")
+
     plt.savefig(path, bbox_inches="tight", pad_inches=0)
     plt.close()

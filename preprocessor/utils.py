@@ -1,7 +1,18 @@
 import os
+import random
 import audio_metadata
+import librosa
+from tqdm import tqdm
 
 from audio_metadata import UnsupportedFormat
+
+def create_graph_example_figures(*signal_processors, song_paths, num_songs=3):
+    for i in tqdm(range(0, num_songs), desc="Creating Example Figures"):
+        path, genre = random.choice(song_paths)
+
+        wave, sr = librosa.load(path, sr=None)
+        for func in signal_processors:
+            func(wave, sr, path=f"figures/{genre}_example_figure_FUNC_{i}.png", debug=True)
 
 def get_song_metadata(path: str) -> str:
     """
@@ -27,6 +38,11 @@ class DatasetReader:
         self._get_files(self.dataset_dir)
 
     def _get_files(self, path):
+        """
+        Recursive function to read all the files in the dataset in each genre directory
+
+        :param path: path to dataset or path in dataset during recursion
+        """
         directory = os.listdir(path)
         for item in directory:
             item_path = os.path.join(path, item)

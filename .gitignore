@@ -2,5 +2,5 @@
 /.idea
 test_files
 test_outputs
-
+figures
 config.env
