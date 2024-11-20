@@ -2,6 +2,7 @@ import os
 import shutil
 
 import librosa
+from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
 from tqdm import tqdm
 
@@ -79,6 +80,7 @@ class Preprocessor:
                 # generate the different audio spectra graphs
                 for func in self._signal_processors:
                     func(segment, sr, path=f"/{output_dir}/FUNC/{count}.png")
+
                 count +=1
 
     def preprocess(self):
@@ -87,7 +89,11 @@ class Preprocessor:
         """
 
         for file, genre in tqdm(self.reader, desc="Preprocessing", total=len(self.reader)):
-            self.process(file, genre)
+            try:
+                self.process(file, genre)
+            except NoBackendError:
+                print(f"WARNING - could not read file '{file}', skipping")
+                continue
 
     def get_reader(self):
         return self.reader

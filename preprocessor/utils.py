@@ -25,7 +25,7 @@ def get_song_metadata(path: str) -> str:
     try:
         metadata = audio_metadata.load(path)
     except UnsupportedFormat:
-        return f"METADATA '{path}' - file type not supported"
+        return f"METADATA '{path}' - could not load file"
 
     return f"METADATA '{path}' - duration:{str(metadata['streaminfo']['duration'])}s bitrate:{metadata['streaminfo']['bitrate']}Kbps sample_rate:{metadata['streaminfo']['sample_rate']}Hz"
 
