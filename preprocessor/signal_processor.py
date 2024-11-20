@@ -100,5 +100,19 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path: str) -> None:
     plt.close()
 
 
-def CQT():
-    pass
+def CQT(wav: np.ndarray, sr: float, path: str):
+    """
+    Generate the constant-Q transform of an audio signal
+
+    :param wave: raw audio data
+    :param sr: sample rate
+    :param path: output path
+    """
+    path = path.replace("FUNC", "CQT")
+
+    C = np.abs(librosa.cqt(wav, sr=sr))
+    plt.figure(figsize=FIGURE_SIZE)
+    librosa.display.specshow(librosa.amplitude_to_db(C, ref=np.max), sr=sr, x_axis='time', y_axis='cqt_note')
+    plt.axis("off")
+    plt.savefig(path, bbox_inches="tight", pad_inches=0)
+    plt.close()
