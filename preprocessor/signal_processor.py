@@ -64,18 +64,26 @@ def STFT(wave: np.ndarray, sr: float, path: str, debug=False) -> None:
     path = path.replace("FUNC", "STFT")
 
     # plot the stft
-    plt.figure(figsize=FIGURE_SIZE)
+    fig = plt.figure(figsize=FIGURE_SIZE)
+    canvas = fig.canvas
+
     plt.pcolormesh(t, f, np.abs(Zxx), shading='gouraud')
     plt.ylim(0, 5000)
 
     if not debug:
         plt.axis("off")
     else:
-        plt.title(f"Example STFT Graph")
+        plt.title("Example STFT Graph")
         plt.colorbar(format="%+2.0f dB")
 
+    canvas.draw()
+
+    # Convert the canvas to an array
+    image_flat = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+    image = image_flat.reshape(*reversed(canvas.get_width_height()), 3)
+
     plt.savefig(path, bbox_inches="tight", pad_inches=0)
-    plt.close()
+    plt.close(fig)
 
 def MEL_SPEC(wave: np.ndarray, sr: float, path: str, debug=False) -> None:
     """

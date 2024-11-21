@@ -81,6 +81,8 @@ class Preprocessor:
                 for func in self._signal_processors:
                     func(segment, sr, path=f"/{output_dir}/FUNC/{count}.png")
 
+                # TODO: create tensor layers with the graphs produced
+
                 count +=1
 
     def preprocess(self):

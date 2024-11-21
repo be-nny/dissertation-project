@@ -7,13 +7,14 @@ from preprocessor import utils as pu
 from dotenv import load_dotenv
 
 # arguments parser
-parser = argparse.ArgumentParser(description="Music Analysis Tool")
+parser = argparse.ArgumentParser(prog='PROG',description="Music Analysis Tool")
 parser.add_argument("-p", "--process", action="store_true", help="Preprocess data")
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-e", "--examples", default=1, type=int, help="Create example figures")
 
+
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parser.parse_args(["--config=config.env", "--examples=2"])
 
     # load config file
     if args.config:
