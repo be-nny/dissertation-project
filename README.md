@@ -14,9 +14,10 @@ Run the following to start the processing phase
 ```pycon
 python main.py -c config.env -p
 ```
+This will create a UUID hex directory with all the preprocessed files with in directory specified under `PREPROCESSED_PATH`
 
 ## Generating Example Figures
-Run the following to generate some preprocessing examples
+Run the following to generate three preprocessing examples
 ```pycon
-python main.py -c config.env -p
+python main.py -c config.env -f 3
 ```

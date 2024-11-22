@@ -10,11 +10,10 @@ from dotenv import load_dotenv
 parser = argparse.ArgumentParser(prog='PROG',description="Music Analysis Tool")
 parser.add_argument("-p", "--process", action="store_true", help="Preprocess data")
 parser.add_argument("-c", "--config", required=True, help="Config file")
-parser.add_argument("-e", "--examples", default=1, type=int, help="Create example figures")
-
+parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="Create a set of n example figures")
 
 if __name__ == "__main__":
-    args = parser.parse_args(["--config=config.env", "--examples=2"])
+    args = parser.parse_args()
 
     # load config file
     if args.config:
@@ -31,5 +30,5 @@ if __name__ == "__main__":
         preprocessor.preprocess()
 
     # create examples
-    if args.examples:
-        pu.create_graph_example_figures(sp.STFT, sp.MEL_SPEC, sp.CQT, song_paths=preprocessor.get_songs(), figures_path=figures_path, num_songs=args.examples)
+    if args.figures:
+        pu.create_graph_example_figures(sp.STFT, sp.MEL_SPEC, sp.CQT, song_paths=preprocessor.get_songs(), figures_path=figures_path, num_songs=args.figures)

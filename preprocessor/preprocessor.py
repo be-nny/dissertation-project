@@ -1,13 +1,16 @@
 import os
-import shutil
-
+import uuid
+import h5py
 import librosa
+import numpy as np
+
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
 from tqdm import tqdm
 
 from . import signal_processor
 from . import utils
+
 
 class Preprocessor:
     def __init__(self, dataset_dir, segment_duration=10, output_dir="test_outputs/"):
@@ -23,8 +26,14 @@ class Preprocessor:
         self.output_dir = output_dir
 
         # creating output directory for preprocess data
-        if os.path.exists(self.output_dir):
-            shutil.rmtree(self.output_dir)
+        if not os.path.exists(self.output_dir):
+            os.mkdir(self.output_dir)
+
+        # create unique dir name
+        new_dir_name = str(uuid.uuid4().hex)
+        print(f"'{new_dir_name}' created")
+        new_path = os.path.join(self.output_dir, new_dir_name)
+        self.output_dir = new_path
         os.mkdir(self.output_dir)
 
         self._signal_processors = None
@@ -41,6 +50,19 @@ class Preprocessor:
 
         self._signal_processors = signal_processors
         return self
+
+    def _create_hdf(self, path: str, **kwargs):
+        """
+        Construct a HDF5 file for a preprocessed song and save it to 'path'.
+
+        :param path: path to save the HDF5 file
+        :param kwards: key value pairs for the hdf file
+        :return:
+        """
+
+        with h5py.File(path, 'w') as hdf5_file:
+            for key, data in kwargs.items():
+                hdf5_file.create_dataset(key, data=data)
 
     def process(self, path: str, genre: str) -> None:
         """
@@ -60,16 +82,6 @@ class Preprocessor:
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
 
-        # creating directory for the song to put the different spectra in
-        output_dir = os.path.join(output_dir, name)
-        if not os.path.exists(output_dir):
-            os.mkdir(output_dir)
-
-        # creating sub dirs
-        for func in self._signal_processors:
-            p = os.path.join(output_dir, func.__name__)
-            os.mkdir(p)
-
         # use the signal processor context to create generator that creates the song snippets
         with signal_processor.SignalLoader(wave, sr, segment_duration=self.segment_duration) as loader:
             count = 1
@@ -78,12 +90,17 @@ class Preprocessor:
                     break
 
                 # generate the different audio spectra graphs
+                layers = []
                 for func in self._signal_processors:
-                    func(segment, sr, path=f"/{output_dir}/FUNC/{count}.png")
+                    img = func(segment, sr)
+                    arr = np.asarray(img)
+                    layers.append(arr)
 
-                # TODO: create tensor layers with the graphs produced
+                # save the layers to HDF5 file
+                file_name = os.path.join(output_dir, f"{name}.h5")
+                self._create_hdf(path=file_name, layers=layers)
 
-                count +=1
+                count += 1
 
     def preprocess(self):
         """
@@ -98,10 +115,20 @@ class Preprocessor:
                 continue
 
     def get_reader(self):
+        """
+        :return: The dataset reader
+        """
         return self.reader
 
     def get_segment_duration(self):
+        """
+        :return: The length in seconds for each segment
+        """
+
         return self.segment_duration
 
     def get_songs(self):
+        """
+        :return: The list of songs
+        """
         return self.reader.files
