@@ -20,7 +20,7 @@ if __name__ == "__main__":
     if args.config:
         load_dotenv(dotenv_path=args.config)
         dataset_path = os.getenv("DATASET_PATH")
-        output_path = os.getenv("OUTPUT_PATH")
+        output_path = os.getenv("PREPROCESSED_PATH")
         figures_path = os.getenv("FIGURES_PATH")
 
     # creating a preprocessor
