@@ -1,6 +1,4 @@
 /.venv
 /.idea
-test_files
-test_outputs
-figures
+out
 config.env
