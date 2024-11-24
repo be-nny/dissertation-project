@@ -13,7 +13,7 @@ parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="Create a set of n example figures")
 
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parser.parse_args(["--process", "--config=config.env"])
 
     # load config file
     if args.config:
@@ -22,8 +22,11 @@ if __name__ == "__main__":
         output_path = os.getenv("PREPROCESSED_PATH")
         figures_path = os.getenv("FIGURES_PATH")
 
+    if dataset_path is None or output_path is None or figures_path is None:
+        raise ValueError(f".env file has missing arguments! got: DATASET_PATH='{dataset_path}', OUTPUT_PATH='{output_path}', FIGURES_PATH='{figures_path}'")
+
     # creating a preprocessor
-    preprocessor = p.Preprocessor(dataset_dir=dataset_path, segment_duration=15, output_dir=output_path).set_signal_processors(sp.STFT, sp.MEL_SPEC, sp.CQT)
+    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=30, segment_duration=15, output_dir=output_path).set_signal_processors(sp.STFT, sp.MEL_SPEC, sp.CQT)
 
     # preprocess
     if args.process:

@@ -14,6 +14,8 @@ plt.close()
 
 FIGURE_SIZE = (10, 10)
 
+# TODO round audio wav to nearest 5 seconds and pad with 0's
+
 class SignalLoader:
     def __init__(self, wave: np.ndarray, sr: float, segment_duration=10):
         """

@@ -2,6 +2,7 @@ import os
 import uuid
 import h5py
 import librosa
+import math
 import numpy as np
 
 from audioread import NoBackendError
@@ -13,7 +14,7 @@ from . import utils
 
 
 class Preprocessor:
-    def __init__(self, dataset_dir, segment_duration=10, output_dir="test_outputs/"):
+    def __init__(self, dataset_dir, output_dir, target_length, segment_duration=10):
         """
         Create a preprocessor to preprocess a set of songs in a dataset.
 
@@ -38,6 +39,7 @@ class Preprocessor:
 
         self._signal_processors = None
         self.segment_duration = segment_duration
+        self.target_length = target_length
         self.reader = utils.DatasetReader(self.dataset_dir)
 
     def set_signal_processors(self, *signal_processors) -> Preprocessor:
@@ -64,6 +66,27 @@ class Preprocessor:
             for key, data in kwargs.items():
                 hdf5_file.create_dataset(key, data=data)
 
+    def _normalise_length(self, wave, sr):
+        """
+        Normalise the length of a waveform so that it is the same length as the target length
+
+        :param wave: waveform to normalise
+        :param sr: the sample rate
+        :return: a waveform that is the same length as the target length and padded if necessary
+        """
+
+        duration = librosa.get_duration(y=wave, sr=sr)
+        diff = self.target_length - duration
+        diff_samples = math.fabs(diff * sr)
+
+        # if the number of samples is larger than the target length, truncate it down
+        # if it's smaller the SignalProcessor will pad the wav
+        if diff < 0:
+            new_samples = int(len(wave) - diff_samples)
+            wave = wave[:new_samples]
+
+        return wave
+
     def process(self, path: str, genre: str) -> None:
         """
         Preprocesses a song and generates a set of audio spectra specified in `set_layers()`
@@ -71,9 +94,14 @@ class Preprocessor:
         :param genre: genre of the song being processed
         :param path: path to audio file
         """
+
         print(f"\n{utils.get_song_metadata(path=path)}")
 
         wave, sr = librosa.load(path, sr=None)
+
+        # normalise the length of the audio file
+        wave = self._normalise_length(wave, sr)
+
         filename = os.path.basename(path)
         name, _ = os.path.splitext(filename)
         output_dir = os.path.join(self.output_dir, genre)
@@ -97,7 +125,7 @@ class Preprocessor:
                     layers.append(arr)
 
                 # save the layers to HDF5 file
-                file_name = os.path.join(output_dir, f"{name}.h5")
+                file_name = os.path.join(output_dir, f"{name}_{count}.h5")
                 self._create_hdf(path=file_name, layers=layers)
 
                 count += 1
@@ -107,7 +135,8 @@ class Preprocessor:
         Preprocesses the dataset
         """
 
-        for file, genre in tqdm(self.reader, desc="Preprocessing", total=len(self.reader)):
+        print("Preprocessing dataset...")
+        for file, genre in tqdm(self.reader, desc="Generating Spectra", total=len(self.reader)):
             try:
                 self.process(file, genre)
             except NoBackendError:
