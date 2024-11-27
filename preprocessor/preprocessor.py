@@ -12,7 +12,6 @@ from tqdm import tqdm
 from . import signal_processor
 from . import utils
 
-
 class Preprocessor:
     def __init__(self, dataset_dir, output_dir, target_length, segment_duration=10):
         """
@@ -161,3 +160,9 @@ class Preprocessor:
         :return: The list of songs
         """
         return self.reader.files
+
+    def get_signal_processors(self):
+        """
+        :return: A list of signal processors
+        """
+        return self._signal_processors

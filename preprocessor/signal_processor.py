@@ -14,8 +14,6 @@ plt.close()
 
 FIGURE_SIZE = (10, 10)
 
-# TODO round audio wav to nearest 5 seconds and pad with 0's
-
 class SignalLoader:
     def __init__(self, wave: np.ndarray, sr: float, segment_duration=10):
         """
@@ -160,3 +158,27 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
         plt.close()
         return None
+
+
+def get_type(name: str):
+    """
+    Returns the function signature from a given name of a signal processor
+
+    :param name: name of signal processor
+    :return: function signature
+    """
+
+    if name == CQT.__name__:
+        return CQT
+    if name == STFT.__name__:
+        return STFT
+    if name == MEL_SPEC.__name__:
+        return MEL_SPEC
+
+    raise ValueError(f"Unknown signal processor: {name}")
+
+def get_all_types():
+    """
+    :return: All signal processors as a list of their names
+    """
+    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__]

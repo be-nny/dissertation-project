@@ -1,32 +1,56 @@
 import os
 import argparse
+import yaml
 
 from preprocessor import preprocessor as p
 from preprocessor import signal_processor as sp
 from preprocessor import utils as pu
 from dotenv import load_dotenv
 
+from preprocessor.signal_processor import get_type, get_all_types
+
 # arguments parser
-parser = argparse.ArgumentParser(prog='PROG',description="Music Analysis Tool")
-parser.add_argument("-p", "--process", action="store_true", help="Preprocess data")
-parser.add_argument("-c", "--config", required=True, help="Config file")
-parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="Create a set of n example figures")
+parser = argparse.ArgumentParser(prog='DATA PREPROCESSOR',
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 description="""
+Preprocess the audio dataset
+         
+'config.env' FIELDS
+-------------------
+DATASET_PATH=''
+PREPROCESSED_PATH=''
+FIGURES_PATH=''
+""")
+parser.add_argument("-c", "--config", required=True, help="config file")
+parser.add_argument("-s", "--signal_processors", required=True, choices=get_all_types(), nargs="+", help="the signal processors to apply to the audio")
+parser.add_argument("-p", "--process", action="store_true", help="preprocesses data the data use the parameters set in the config file")
+parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="create a set of n example figures")
 
 if __name__ == "__main__":
-    args = parser.parse_args(["--process", "--config=config.env"])
+    args = parser.parse_args(["--config=config.yml", "--signal_processors=STFT", "-f 1"])
 
     # load config file
     if args.config:
-        load_dotenv(dotenv_path=args.config)
-        dataset_path = os.getenv("DATASET_PATH")
-        output_path = os.getenv("PREPROCESSED_PATH")
-        figures_path = os.getenv("FIGURES_PATH")
+        with open(args.config, 'r') as f:
+            yml_data = yaml.load(f, Loader=yaml.FullLoader)
+        dataset_path = yml_data["dataset"]
+        output_path = yml_data["preprocessor_config"]["preprocessed_output"]
+        figures_path = yml_data["preprocessor_config"]["figures_output"]
+        target_length = yml_data["preprocessor_config"]["target_length"]
+        segment_duration = yml_data["preprocessor_config"]["segment_duration"]
 
-    if dataset_path is None or output_path is None or figures_path is None:
-        raise ValueError(f".env file has missing arguments! got: DATASET_PATH='{dataset_path}', OUTPUT_PATH='{output_path}', FIGURES_PATH='{figures_path}'")
+    # get signal processor args
+    signal_processors = []
+    if args.signal_processors:
+        for s in args.signal_processors:
+            try:
+                name = get_type(s)
+                signal_processors.append(get_type(s))
+            except ValueError as e:
+                raise e
 
     # creating a preprocessor
-    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=30, segment_duration=15, output_dir=output_path).set_signal_processors(sp.STFT, sp.MEL_SPEC, sp.CQT)
+    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=target_length, segment_duration=segment_duration, output_dir=output_path).set_signal_processors(*signal_processors)
 
     # preprocess
     if args.process:
@@ -34,4 +58,4 @@ if __name__ == "__main__":
 
     # create examples
     if args.figures:
-        pu.create_graph_example_figures(sp.STFT, sp.MEL_SPEC, sp.CQT, song_paths=preprocessor.get_songs(), figures_path=figures_path, num_songs=args.figures)
+        pu.create_graph_example_figures(*preprocessor.get_signal_processors(), song_paths=preprocessor.get_songs(), figures_path=figures_path, num_songs=args.figures)
