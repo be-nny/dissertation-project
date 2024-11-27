@@ -24,7 +24,7 @@ parser.add_argument("-p", "--process", action="store_true", help="preprocesses d
 parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="create a set of n example figures")
 
 if __name__ == "__main__":
-    args = parser.parse_args(["--config=config.yml", "--signal_processors=STFT", "-f 1"])
+    args = parser.parse_args()
 
     # load config file
     if args.config:
