@@ -1,12 +1,8 @@
-import os
 import argparse
 import yaml
 
 from preprocessor import preprocessor as p
-from preprocessor import signal_processor as sp
 from preprocessor import utils as pu
-from dotenv import load_dotenv
-
 from preprocessor.signal_processor import get_type, get_all_types
 
 # arguments parser
