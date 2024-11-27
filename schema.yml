@@ -1,0 +1,28 @@
+type: object
+properties:
+  dataset:
+    type: string
+    description: Path to the dataset directory
+  preprocessor_config:
+    type: object
+    properties:
+      target_length:
+        type: integer
+        description: Target length of audio samples (in seconds)
+      segment_duration:
+        type: integer
+        description: Duration of each segment for preprocessing (in seconds)
+      preprocessed_output:
+        type: string
+        description: Path to save preprocessed outputs
+      figures_output:
+        type: string
+        description: Path to save output figures
+    required:
+      - target_length
+      - segment_duration
+      - preprocessed_output
+      - figures_output
+required:
+  - dataset
+  - preprocessor_config

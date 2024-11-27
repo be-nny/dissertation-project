@@ -4,6 +4,7 @@ import yaml
 from preprocessor import preprocessor as p
 from preprocessor import utils as pu
 from preprocessor.signal_processor import get_type, get_all_types
+from jsonschema import validate
 
 # arguments parser
 parser = argparse.ArgumentParser(prog='DATA PREPROCESSOR',
@@ -29,6 +30,11 @@ if __name__ == "__main__":
     if args.config:
         with open(args.config, 'r') as f:
             yml_data = yaml.load(f, Loader=yaml.FullLoader)
+
+        # validating schema
+        with open("schema.yml", 'r') as schema:
+            validate(yml_data, yaml.load(schema, Loader=yaml.FullLoader))
+
         dataset_path = yml_data["dataset"]
         output_path = yml_data["preprocessor_config"]["preprocessed_output"]
         figures_path = yml_data["preprocessor_config"]["figures_output"]
