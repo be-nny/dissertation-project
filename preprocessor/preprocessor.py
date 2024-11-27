@@ -7,10 +7,12 @@ import numpy as np
 
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
+from pydub import AudioSegment, effects
 from tqdm import tqdm
 
 from . import signal_processor
 from . import utils
+
 
 class Preprocessor:
     def __init__(self, dataset_dir, output_dir, target_length, segment_duration=10):
@@ -86,6 +88,20 @@ class Preprocessor:
 
         return wave
 
+    def _rms_normalise_audio(self, wave, rms=0.1):
+        """
+        Root Mean Squared (RMS) audio normalisation. Balances the perceived loudness to create a cohesive
+        sound across all sources.
+
+        :param wave: input wave
+        :return: normalised wave
+        """
+
+        rms_original = np.sqrt(np.mean(wave ** 2))
+        scale_factor = rms / rms_original
+        wave_normalised = wave * scale_factor
+        return wave_normalised
+
     def process(self, path: str, genre: str) -> None:
         """
         Preprocesses a song and generates a set of audio spectra specified in `set_layers()`
@@ -96,10 +112,12 @@ class Preprocessor:
 
         print(f"\n{utils.get_song_metadata(path=path)}")
 
+        # load wave source
         wave, sr = librosa.load(path, sr=None)
 
         # normalise the length of the audio file
         wave = self._normalise_length(wave, sr)
+        wave = self._rms_normalise_audio(wave)
 
         filename = os.path.basename(path)
         name, _ = os.path.splitext(filename)
