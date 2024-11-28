@@ -7,7 +7,6 @@ import numpy as np
 
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
-from pydub import AudioSegment, effects
 from tqdm import tqdm
 
 from . import signal_processor
@@ -104,7 +103,7 @@ class Preprocessor:
 
     def process(self, path: str, genre: str) -> None:
         """
-        Preprocesses a song and generates a set of audio spectra specified in `set_layers()`
+        Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
 
         :param genre: genre of the song being processed
         :param path: path to audio file

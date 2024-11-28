@@ -7,19 +7,9 @@ from preprocessor.signal_processor import get_type, get_all_types
 from jsonschema import validate
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='DATA PREPROCESSOR',
-                                 formatter_class=argparse.RawDescriptionHelpFormatter,
-                                 description="""
-Preprocess the audio dataset
-         
-'config.env' FIELDS
--------------------
-DATASET_PATH=''
-PREPROCESSED_PATH=''
-FIGURES_PATH=''
-""")
+parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - PREPROCESSOR', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="config file")
-parser.add_argument("-s", "--signal_processors", required=True, choices=get_all_types(), nargs="+", help="the signal processors to apply to the audio")
+parser.add_argument("-s", "--signal_processors", required=True, choices=get_all_types(), nargs="+", help="the signal processors to apply to the raw audio")
 parser.add_argument("-p", "--process", action="store_true", help="preprocesses data the data use the parameters set in the config file")
 parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="create a set of n example figures")
 
