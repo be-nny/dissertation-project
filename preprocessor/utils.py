@@ -41,22 +41,32 @@ def get_song_metadata(path: str) -> str:
 
 
 class DatasetReader:
-    def __init__(self, dataset_dir, logger):
+    def __init__(self, dataset_dir, logger, train_split=0.6):
         self.dataset_dir = dataset_dir
         self.logger = logger
         self.files = []
         self.current = 0
 
+        self.train_split = train_split
+
         self.logger.info("Reading dataset files")
         self._get_files(self.dataset_dir)
         self.logger.info("Completed reading dataset!")
 
-        # shuffle the dataset
-        random.shuffle(self.files)
+        self.files_dict = {}
+        for path, genre in self.files:
+            if genre.lower() not in self.files_dict:
+                self.files_dict.update({genre.lower(): []})
+
+            self.files_dict[genre.lower()].append(path)
 
         self.logger.info("Under sampling dataset files")
         sample_size = self._under_sample()
         self.logger.info(f"Completed under sampling dataset with sample size: {sample_size}!")
+
+        self.logger.info("Creating test train split")
+        self._test_train_split()
+        self.logger.info("Completed creating test train split!")
 
     def _get_files(self, path: str) -> None:
         """
@@ -83,42 +93,54 @@ class DatasetReader:
 
     def _under_sample(self):
         """
-        Under samples the dataset so that all genres have the same number of samples as the minimum sample size
+        Under samples the dataset so that all genres have the same number of samples as the minimum sample size.
+        Chooses k random samples from the files dictionary of genres and songs
 
         :return: new sample size of each genre
         """
+        min_val = min([len(files) for _, files in self.files_dict.items()])
 
-        genre_dict = {}
+        # choosing k random samples from the files dictionary of genres and songs
+        for genre in self.files_dict:
+            self.files_dict[genre] = random.sample(self.files_dict[genre], min_val)
 
+        self.total_length = len(self.files_dict) * min_val
+
+        return min_val
+
+    def _test_train_split(self):
+        files_dict = {}
         for path, genre in self.files:
-            # adding a count to each genre
-            if genre not in genre_dict:
-                genre_dict.update({genre: 1})
-            else:
-                genre_dict[genre] += 1
+            if genre.lower() not in files_dict:
+                files_dict.update({genre.lower(): []})
 
-        min_genre_val = genre_dict[min(genre_dict, key=genre_dict.get)]
+            files_dict[genre.lower()].append(path)
 
-        tmp = self.files
-        for path, genre in tmp:
-            num_genre = genre_dict[genre]
-            if num_genre > min_genre_val:
-                self.files.remove((path, genre))
+        # creating a test train split
+        self.test_train_split = {}
+        for genre, files in files_dict.items():
+            random.shuffle(files)
+            tot = len(files)
+            train_num = int(tot * self.train_split)
 
-        return min_genre_val
+            self.test_train_split.update({genre: {"train": files[:train_num], "test": files[train_num+1:]}})
 
-    def __next__(self):
-        if self.current < len(self.files):
-            current_path = self.files[self.current]
-            self.current += 1
-            return current_path[0], current_path[1]
-        raise StopIteration
+    def __enter__(self):
+        for genre, splits in self.test_train_split.items():
+            train = splits["train"]
+            test = splits["test"]
 
-    def __iter__(self):
-        return self
+            for path in train:
+                yield "train", path, genre
+
+            for path in test:
+                yield "test", path, genre
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
     def __len__(self):
-        return len(self.files)
+        return self.total_length
 
 class JobLogger:
     def __init__(self, uuid_path):

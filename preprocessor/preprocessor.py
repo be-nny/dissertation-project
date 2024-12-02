@@ -14,7 +14,7 @@ from . import signal_processor
 from . import utils
 
 class Preprocessor:
-    def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, segment_duration=10):
+    def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, train_split=0.6, segment_duration=10):
         """
         Create a preprocessor to preprocess a set of songs in a dataset.
 
@@ -37,9 +37,13 @@ class Preprocessor:
         self.uuid_path = os.path.join(self.output_dir, new_dir_name)
         os.mkdir(self.uuid_path)
 
-        # adding 'preprocessed' to output path
-        self.preprocessed_path = os.path.join(self.uuid_path, "preprocessed")
-        os.mkdir(self.preprocessed_path)
+        # adding 'train' to output path
+        self.train_split = os.path.join(self.uuid_path, "train")
+        os.mkdir(self.train_split)
+
+        # adding 'test' to output path
+        self.test_split = os.path.join(self.uuid_path, "test")
+        os.mkdir(self.test_split)
 
         # add 'figures' to output path
         self.figures_path = os.path.join(self.uuid_path, "figures")
@@ -49,7 +53,7 @@ class Preprocessor:
         self.segment_duration = segment_duration
         self.target_length = target_length
 
-        self.reader = utils.DatasetReader(self.dataset_dir, self.logger)
+        self.reader = utils.DatasetReader(self.dataset_dir, self.logger, train_split=train_split)
 
     def set_signal_processors(self, *signal_processors) -> Preprocessor:
         """
@@ -110,7 +114,7 @@ class Preprocessor:
         wave_normalised = wave * scale_factor
         return wave_normalised
 
-    def process(self, path: str, genre: str) -> None:
+    def process(self, path: str, genre: str, split_type: str) -> None:
         """
         Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
 
@@ -126,7 +130,11 @@ class Preprocessor:
 
         filename = os.path.basename(path)
         name, _ = os.path.splitext(filename)
-        output_dir = os.path.join(self.preprocessed_path, genre)
+
+        if split_type == 'train':
+            output_dir = os.path.join(self.train_split, genre)
+        else:
+            output_dir = os.path.join(self.test_split, genre)
 
         # creating directory for the genre to put the different spectra in
         if not os.path.exists(output_dir):
@@ -158,12 +166,16 @@ class Preprocessor:
         """
 
         self.logger.info("Preprocessing dataset...")
-        for file, genre in tqdm(self.reader, desc="Generating Spectra", total=len(self.reader)):
-            try:
-                self.process(file, genre)
-            except NoBackendError:
-                self.logger.warning(f"Could not read file '{file}' with META DATA `{utils.get_song_metadata(path=file)}' skipping")
-                continue
+
+        with self.reader as r:
+            for split_type, file, genre in tqdm(r, desc="Generating Spectra", total=len(self.reader)):
+                try:
+                    self.process(file, genre, split_type)
+                except NoBackendError:
+                    self.logger.warning(
+                        f"Could not read file '{file}' with META DATA `{utils.get_song_metadata(path=file)}' skipping")
+                    continue
+
 
     def get_reader(self) -> utils.DatasetReader:
         """

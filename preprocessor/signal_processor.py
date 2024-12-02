@@ -4,7 +4,6 @@ import matplotlib
 import numpy as np
 
 from PIL import Image
-from tqdm import tqdm
 from matplotlib import pyplot as plt
 from scipy import signal
 
@@ -37,7 +36,7 @@ class SignalLoader:
         """
 
         segment_length = self.sr * self.segment_duration
-        for segment in tqdm(range(0, len(self.wave), segment_length), colour="green", desc="Segmenting"):
+        for segment in range(0, len(self.wave), segment_length):
             wav = self.wave[segment: segment + segment_length]
             # padding the array with zeros if the wav form wav doesn't match the segment length
             if len(wav) != segment_length:

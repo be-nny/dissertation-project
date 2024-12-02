@@ -12,6 +12,9 @@ properties:
       segment_duration:
         type: integer
         description: Duration of each segment for preprocessing (in seconds)
+      train_split:
+        type: number
+        description: Train split
       output:
         type: string
         description: Path to save preprocessed outputs

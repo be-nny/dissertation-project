@@ -31,6 +31,7 @@ if __name__ == "__main__":
         output_path = yml_data["preprocessor_config"]["output"]
         target_length = yml_data["preprocessor_config"]["target_length"]
         segment_duration = yml_data["preprocessor_config"]["segment_duration"]
+        train_split = yml_data["preprocessor_config"]["train_split"]
 
     # get signal processor args
     signal_processors = []
@@ -44,7 +45,7 @@ if __name__ == "__main__":
                 raise e
 
     # creating a preprocessor
-    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=target_length, segment_duration=segment_duration, output_dir=output_path, logger=logger).set_signal_processors(*signal_processors)
+    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=target_length, segment_duration=segment_duration, output_dir=output_path, logger=logger, train_split=train_split).set_signal_processors(*signal_processors)
 
     # create examples
     if args.figures:
