@@ -2,13 +2,14 @@ import os
 import random
 import audio_metadata
 import librosa
+from audioread import NoBackendError
 from tqdm import tqdm
 
 from audio_metadata import UnsupportedFormat
 
 def create_graph_example_figures(*signal_processors, song_paths, figures_path, num_songs=3) -> None:
     """
-    Creates a set of example figures for a given song. This uses the entire duraiton of the song
+    Creates a set of example figures for a given song. This uses the entire duration of the song
 
     :param signal_processors: the signal processor functions to apply to the wave form
     :param song_paths: list of all songs
@@ -40,11 +41,15 @@ def get_song_metadata(path: str) -> str:
 
 
 class DatasetReader:
-    def __init__(self, dataset_dir):
+    def __init__(self, dataset_dir, logger):
         self.dataset_dir = dataset_dir
+        self.logger = logger
         self.files = []
         self.current = 0
+
+        self.logger.info("Reading dataset files")
         self._get_files(self.dataset_dir)
+        self.logger.info("Completed reading dataset!")
 
     def _get_files(self, path):
         """
@@ -52,6 +57,7 @@ class DatasetReader:
 
         :param path: path to dataset or path in dataset during recursion
         """
+
         directory = os.listdir(path)
         for item in directory:
             item_path = os.path.join(path, item)
@@ -60,7 +66,13 @@ class DatasetReader:
             else:
                 if item_path.endswith(".wav") or item_path.endswith(".mp3"):
                     genre_name = os.path.basename(path).lower()
-                    self.files.append((item_path, genre_name))
+                    try:
+                        # try and load the file as this is what the preprocessing loads with
+                        # if it fails, don't add the song to the list of files
+                        librosa.load(item_path, sr=None)
+                        self.files.append((item_path, genre_name))
+                    except NoBackendError:
+                        self.logger.warning(f"Could not read file '{item_path}', skipping")
 
     def __next__(self):
         if self.current < len(self.files):
@@ -74,3 +86,9 @@ class DatasetReader:
 
     def __len__(self):
         return len(self.files)
+
+class JobLogger:
+    def __init__(self, uuid_path):
+        self.uuid_path = uuid_path
+        self.job_log_book = os.path.join(self.uuid_path, "job_log.json")
+

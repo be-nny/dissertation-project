@@ -5,6 +5,7 @@ from preprocessor import preprocessor as p
 from preprocessor import utils as pu
 from preprocessor.signal_processor import get_type, get_all_types
 from jsonschema import validate
+from mat_logger import mat_logger
 
 # arguments parser
 parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - PREPROCESSOR', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
@@ -15,6 +16,7 @@ parser.add_argument("-f", "--figures", action="store", default=1, type=int, help
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    logger = mat_logger.get_logger()
 
     # load config file
     if args.config:
@@ -26,8 +28,7 @@ if __name__ == "__main__":
             validate(yml_data, yaml.load(schema, Loader=yaml.FullLoader))
 
         dataset_path = yml_data["dataset"]
-        output_path = yml_data["preprocessor_config"]["preprocessed_output"]
-        figures_path = yml_data["preprocessor_config"]["figures_output"]
+        output_path = yml_data["preprocessor_config"]["output"]
         target_length = yml_data["preprocessor_config"]["target_length"]
         segment_duration = yml_data["preprocessor_config"]["segment_duration"]
 
@@ -39,15 +40,16 @@ if __name__ == "__main__":
                 name = get_type(s)
                 signal_processors.append(get_type(s))
             except ValueError as e:
+                logger.error(e)
                 raise e
 
     # creating a preprocessor
-    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=target_length, segment_duration=segment_duration, output_dir=output_path).set_signal_processors(*signal_processors)
+    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=target_length, segment_duration=segment_duration, output_dir=output_path, logger=logger).set_signal_processors(*signal_processors)
+
+    # create examples
+    if args.figures:
+        pu.create_graph_example_figures(*preprocessor.get_signal_processors(), song_paths=preprocessor.get_songs(), figures_path=preprocessor.get_figures_path(), num_songs=args.figures)
 
     # preprocess
     if args.process:
         preprocessor.preprocess()
-
-    # create examples
-    if args.figures:
-        pu.create_graph_example_figures(*preprocessor.get_signal_processors(), song_paths=preprocessor.get_songs(), figures_path=figures_path, num_songs=args.figures)

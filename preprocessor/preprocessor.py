@@ -9,12 +9,12 @@ from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
 from tqdm import tqdm
 
+import logging
 from . import signal_processor
 from . import utils
 
-
 class Preprocessor:
-    def __init__(self, dataset_dir, output_dir, target_length, segment_duration=10):
+    def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, segment_duration=10):
         """
         Create a preprocessor to preprocess a set of songs in a dataset.
 
@@ -25,22 +25,31 @@ class Preprocessor:
 
         self.dataset_dir = dataset_dir
         self.output_dir = output_dir
+        self.logger = logger
 
         # creating output directory for preprocess data
         if not os.path.exists(self.output_dir):
             os.mkdir(self.output_dir)
 
         # create unique dir name
-        new_dir_name = str(uuid.uuid4().hex)
-        print(f"'{new_dir_name}' created")
-        new_path = os.path.join(self.output_dir, new_dir_name)
-        self.output_dir = new_path
-        os.mkdir(self.output_dir)
+        new_dir_name = str(uuid.uuid4().hex)[:6]
+        self.logger.info(f"'{new_dir_name}' created")
+        self.uuid_path = os.path.join(self.output_dir, new_dir_name)
+        os.mkdir(self.uuid_path)
+
+        # adding 'preprocessed' to output path
+        self.preprocessed_path = os.path.join(self.uuid_path, "preprocessed")
+        os.mkdir(self.preprocessed_path)
+
+        # add 'figures' to output path
+        self.figures_path = os.path.join(self.uuid_path, "figures")
+        os.mkdir(self.figures_path)
 
         self._signal_processors = None
         self.segment_duration = segment_duration
         self.target_length = target_length
-        self.reader = utils.DatasetReader(self.dataset_dir)
+
+        self.reader = utils.DatasetReader(self.dataset_dir, self.logger)
 
     def set_signal_processors(self, *signal_processors) -> Preprocessor:
         """
@@ -108,9 +117,6 @@ class Preprocessor:
         :param genre: genre of the song being processed
         :param path: path to audio file
         """
-
-        print(f"\n{utils.get_song_metadata(path=path)}")
-
         # load wave source
         wave, sr = librosa.load(path, sr=None)
 
@@ -120,7 +126,7 @@ class Preprocessor:
 
         filename = os.path.basename(path)
         name, _ = os.path.splitext(filename)
-        output_dir = os.path.join(self.output_dir, genre)
+        output_dir = os.path.join(self.preprocessed_path, genre)
 
         # creating directory for the genre to put the different spectra in
         if not os.path.exists(output_dir):
@@ -146,40 +152,67 @@ class Preprocessor:
 
                 count += 1
 
-    def preprocess(self):
+    def preprocess(self) -> None:
         """
         Preprocesses the dataset
         """
 
-        print("Preprocessing dataset...")
+        self.logger.info("Preprocessing dataset...")
         for file, genre in tqdm(self.reader, desc="Generating Spectra", total=len(self.reader)):
             try:
                 self.process(file, genre)
             except NoBackendError:
-                print(f"WARNING - could not read file '{file}', skipping")
+                self.logger.warning(f"Could not read file '{file}' with META DATA `{utils.get_song_metadata(path=file)}' skipping")
                 continue
 
-    def get_reader(self):
+    def get_reader(self) -> utils.DatasetReader:
         """
         :return: The dataset reader
         """
         return self.reader
 
-    def get_segment_duration(self):
+    def get_segment_duration(self) -> float:
         """
         :return: The length in seconds for each segment
         """
 
         return self.segment_duration
 
-    def get_songs(self):
+    def get_songs(self) -> list:
         """
         :return: The list of songs
         """
         return self.reader.files
 
-    def get_signal_processors(self):
+    def get_signal_processors(self) -> list:
         """
         :return: A list of signal processors
         """
         return self._signal_processors
+
+    def get_uuid_path(self) -> str:
+        """
+        Get the current UUID path
+
+        :return: UUID path
+        """
+
+        return self.uuid_path
+
+    def get_figures_path(self) -> str:
+        """
+        Get the figures path
+
+        :return: figures path
+        """
+
+        return self.figures_path
+
+    def get_preprocessed_path(self) -> str:
+        """
+        Get the preprocessed path
+
+        :return: preprocessed path
+        """
+
+        return self.preprocessed_path

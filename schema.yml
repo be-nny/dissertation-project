@@ -12,17 +12,13 @@ properties:
       segment_duration:
         type: integer
         description: Duration of each segment for preprocessing (in seconds)
-      preprocessed_output:
+      output:
         type: string
         description: Path to save preprocessed outputs
-      figures_output:
-        type: string
-        description: Path to save output figures
     required:
       - target_length
       - segment_duration
-      - preprocessed_output
-      - figures_output
+      - output
 required:
   - dataset
   - preprocessor_config
