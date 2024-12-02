@@ -51,7 +51,14 @@ class DatasetReader:
         self._get_files(self.dataset_dir)
         self.logger.info("Completed reading dataset!")
 
-    def _get_files(self, path):
+        # shuffle the dataset
+        random.shuffle(self.files)
+
+        self.logger.info("Under sampling dataset files")
+        sample_size = self._under_sample()
+        self.logger.info(f"Completed under sampling dataset with sample size: {sample_size}!")
+
+    def _get_files(self, path: str) -> None:
         """
         Recursive function to read all the files in the dataset in each genre directory
 
@@ -73,6 +80,32 @@ class DatasetReader:
                         self.files.append((item_path, genre_name))
                     except NoBackendError:
                         self.logger.warning(f"Could not read file '{item_path}', skipping")
+
+    def _under_sample(self):
+        """
+        Under samples the dataset so that all genres have the same number of samples as the minimum sample size
+
+        :return: new sample size of each genre
+        """
+
+        genre_dict = {}
+
+        for path, genre in self.files:
+            # adding a count to each genre
+            if genre not in genre_dict:
+                genre_dict.update({genre: 1})
+            else:
+                genre_dict[genre] += 1
+
+        min_genre_val = genre_dict[min(genre_dict, key=genre_dict.get)]
+
+        tmp = self.files
+        for path, genre in tmp:
+            num_genre = genre_dict[genre]
+            if num_genre > min_genre_val:
+                self.files.remove((path, genre))
+
+        return min_genre_val
 
     def __next__(self):
         if self.current < len(self.files):
