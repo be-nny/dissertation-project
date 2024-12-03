@@ -64,7 +64,7 @@ class DatasetReader:
         self.logger.info(f"Genre sample size: {sample_size}")
 
         self._test_train_split()
-        self.logger.info(f"Train/Test split is {self.train_split*100}:{(1-self.train_split)*100}")
+        self.logger.info(f"Train/Test split is {int(self.train_split*100)}:{(1-self.train_split)*100}")
 
     def _get_files(self, path: str) -> None:
         """
@@ -123,7 +123,7 @@ class DatasetReader:
 
             self.test_train_split.update({genre: {"train": files[:train_num], "test": files[train_num+1:]}})
 
-    def __enter__(self):
+    def generate(self):
         for genre, splits in self.test_train_split.items():
             train = splits["train"]
             test = splits["test"]
@@ -133,6 +133,9 @@ class DatasetReader:
 
             for path in test:
                 yield "test", path, genre
+
+    def __enter__(self):
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass

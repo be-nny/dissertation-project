@@ -79,6 +79,8 @@ class Preprocessor:
             for key, data in kwargs.items():
                 hdf5_file.create_dataset(key, data=data)
 
+            hdf5_file.close()
+
     def _normalise_length(self, wave, sr):
         """
         Normalise the length of a waveform so that it is the same length as the target length
@@ -158,6 +160,9 @@ class Preprocessor:
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
                 self._create_hdf(path=file_name, layers=layers)
 
+                # properly discard the layers arr
+                del layers
+
                 count += 1
 
     def preprocess(self) -> None:
@@ -168,7 +173,7 @@ class Preprocessor:
         self.logger.info("Preprocessing dataset...")
 
         with self.reader as r:
-            for split_type, file, genre in tqdm(r, desc="Generating Spectra", total=len(self.reader)):
+            for split_type, file, genre in tqdm(r.generate(), desc="Generating Spectra", total=len(self.reader), unit="file"):
                 try:
                     self.process(file, genre, split_type)
                 except NoBackendError:
