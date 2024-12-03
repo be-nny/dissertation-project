@@ -33,6 +33,9 @@ if __name__ == "__main__":
         segment_duration = yml_data["preprocessor_config"]["segment_duration"]
         train_split = yml_data["preprocessor_config"]["train_split"]
 
+        if train_split > 1:
+            raise ValueError("'train_split' must be <= 1")
+
     # get signal processor args
     signal_processors = []
     if args.signal_processors:
@@ -52,5 +55,4 @@ if __name__ == "__main__":
         pu.create_graph_example_figures(*preprocessor.get_signal_processors(), song_paths=preprocessor.get_songs(), figures_path=preprocessor.get_figures_path(), num_songs=args.figures)
 
     # preprocess
-    if args.process:
-        preprocessor.preprocess()
+

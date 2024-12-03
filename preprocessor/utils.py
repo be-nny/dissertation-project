@@ -2,9 +2,9 @@ import os
 import random
 import audio_metadata
 import librosa
+
 from audioread import NoBackendError
 from tqdm import tqdm
-
 from audio_metadata import UnsupportedFormat
 
 def create_graph_example_figures(*signal_processors, song_paths, figures_path, num_songs=3) -> None:
@@ -51,7 +51,7 @@ class DatasetReader:
 
         self.logger.info("Reading dataset files")
         self._get_files(self.dataset_dir)
-        self.logger.info("Completed reading dataset!")
+        self.logger.info("Completed reading dataset")
 
         self.files_dict = {}
         for path, genre in self.files:
@@ -60,13 +60,11 @@ class DatasetReader:
 
             self.files_dict[genre.lower()].append(path)
 
-        self.logger.info("Under sampling dataset files")
         sample_size = self._under_sample()
-        self.logger.info(f"Completed under sampling dataset with sample size: {sample_size}!")
+        self.logger.info(f"Genre sample size: {sample_size}")
 
-        self.logger.info("Creating test train split")
         self._test_train_split()
-        self.logger.info("Completed creating test train split!")
+        self.logger.info(f"Train/Test split is {self.train_split*100}:{(1-self.train_split)*100}")
 
     def _get_files(self, path: str) -> None:
         """

@@ -176,7 +176,6 @@ class Preprocessor:
                         f"Could not read file '{file}' with META DATA `{utils.get_song_metadata(path=file)}' skipping")
                     continue
 
-
     def get_reader(self) -> utils.DatasetReader:
         """
         :return: The dataset reader
