@@ -55,4 +55,5 @@ if __name__ == "__main__":
         pu.create_graph_example_figures(*preprocessor.get_signal_processors(), song_paths=preprocessor.get_songs(), figures_path=preprocessor.get_figures_path(), num_songs=args.figures)
 
     # preprocess
-
+    if args.process:
+        preprocessor.preprocess()
