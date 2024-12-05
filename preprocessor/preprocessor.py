@@ -4,12 +4,12 @@ import h5py
 import librosa
 import math
 import numpy as np
+import logging
 
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
 from tqdm import tqdm
 
-import logging
 from . import signal_processor
 from . import utils
 

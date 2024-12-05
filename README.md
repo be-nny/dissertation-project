@@ -33,7 +33,7 @@ output: "/output/directory"
 preprocessor_config:
   target_length: target_length_of_all_songs_int
   segment_duration: the_snippet_length_of_each_song_int
-  train_split: 0.8
+  train_split: float_val_between_0_1
 ```
 
 ### Dataset Directory
@@ -49,3 +49,15 @@ dataset/
 ```
 A root directory containing a list of subdirectories named as the genre name with a series of `mp3` or `wav` files in them.
 This project primarily uses the `GTZAN` dataset, which can be downloaded [here](https://www.kaggle.com/datasets/andradaolteanu/gtzan-dataset-music-genre-classification).
+
+### Spectrographs
+Below demonstrates the possible spectrographs that can be generated in the preprocessing pipeline
+#### CQT example Figure
+![rock_example_figure_CQT_0.png](examples/rock_example_figure_CQT_0.png)
+#### Mel Spectrogram Example Figure
+![rock_example_figure_MEL_SPEC_0.png](examples/rock_example_figure_MEL_SPEC_0.png)
+#### Spectral Centroid Example Figure
+![rock_example_figure_SPEC_CENTROID_0.png](examples/rock_example_figure_SPEC_CENTROID_0.png)
+#### Short-time Fourier Transform Example Figure
+![rock_example_figure_STFT_0.png](examples/rock_example_figure_STFT_0.png)
+
