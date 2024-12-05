@@ -3,6 +3,9 @@ properties:
   dataset:
     type: string
     description: Path to the dataset directory
+  output:
+    type: string
+    description: Path to save preprocessed outputs
   preprocessor_config:
     type: object
     properties:
@@ -15,13 +18,10 @@ properties:
       train_split:
         type: number
         description: Train split
-      output:
-        type: string
-        description: Path to save preprocessed outputs
     required:
       - target_length
       - segment_duration
-      - output
 required:
   - dataset
+  - output
   - preprocessor_config

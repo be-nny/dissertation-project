@@ -28,7 +28,7 @@ if __name__ == "__main__":
             validate(yml_data, yaml.load(schema, Loader=yaml.FullLoader))
 
         dataset_path = yml_data["dataset"]
-        output_path = yml_data["preprocessor_config"]["output"]
+        output_path = yml_data["output"]
         target_length = yml_data["preprocessor_config"]["target_length"]
         segment_duration = yml_data["preprocessor_config"]["segment_duration"]
         train_split = yml_data["preprocessor_config"]["train_split"]

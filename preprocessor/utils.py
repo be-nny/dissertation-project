@@ -147,4 +147,13 @@ class JobLogger:
     def __init__(self, uuid_path):
         self.uuid_path = uuid_path
         self.job_log_book = os.path.join(self.uuid_path, "job_log.json")
+        self.file = None
+
+    def __enter__(self):
+        with open(self.job_log_book, "w") as f:
+            self.file = f
+            return self.file
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.file.close()
 

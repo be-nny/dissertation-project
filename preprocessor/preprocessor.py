@@ -123,6 +123,7 @@ class Preprocessor:
         :param genre: genre of the song being processed
         :param path: path to audio file
         """
+
         # load wave source
         wave, sr = librosa.load(path, sr=None)
 
@@ -180,6 +181,10 @@ class Preprocessor:
                     self.logger.warning(
                         f"Could not read file '{file}' with META DATA `{utils.get_song_metadata(path=file)}' skipping")
                     continue
+        return self
+
+    def write_report(self):
+        pass
 
     def get_reader(self) -> utils.DatasetReader:
         """
