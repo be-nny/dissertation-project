@@ -49,11 +49,14 @@ class SignalLoader:
 
 def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     """
-    Create a Short Time Fourier Transform for a waveform
+    Create a Short Time Fourier Transform for a waveform.
+    This a method for analyzing how the frequency content of a signal changes over time.
+    The initial signal is broken down into small discrete samples of time before having a Fourier Transform applied to it.
 
     :param wave: raw audio data
     :param sr: sample rate
     :param path: output path, default to None
+    :return: stft as an image array
     """
 
     # if the length of the wav is smaller than the window function, stop
@@ -89,11 +92,15 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
 
 def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
     """
-    Create a Mel Spectrogram for a waveform
+    Create a Mel Spectrogram for a waveform.
+    This is a visual representation of the frequency spectrum of an audio signal over time, where the frequencies are converted to the mel scale
+    It displays the intensity of different frequency components in an audio signal.
 
     :param wave: raw audio data
     :param sr: sample rate
     :param path: output path, default to None
+    :param debug: debug mode, default to False
+    :return: mel spectrogram as an image array
     """
 
     # if the length of the wav is smaller than the window function, stop
@@ -129,11 +136,15 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
 
 def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
     """
-    Generate the constant-Q transform of an audio signal
+    Generate the constant-Q transform of an audio signal.
+    This converts a data series from the time domain to the frequency domain.
+    The CQT's output bins are spaced logarithmically in frequency, unlike the short-time Fourier transform, which uses linear spacing.
 
     :param wav: raw audio data
     :param sr: sample rate
     :param path: output path, default to None
+    :param debug: debug mode, default to False
+    :return: cqt as an image array
     """
 
     C = np.abs(librosa.cqt(wav, sr=sr))
@@ -158,6 +169,45 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
         plt.close()
         return None
 
+def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
+    """
+    Generate a spectral centroid of the audio file.
+    A spectral centroid is the location of the centre of mass of the spectrum.
+
+    :param wav: raw audio data
+    :param sr: sample rate
+    :param path: output path, default to None
+    :param debug: debug mode, default to False
+    :return: spectral centroid as an image array
+    """
+
+    S, _ = librosa.magphase(librosa.stft(y=wav))
+    spectral_centroid = librosa.feature.spectral_centroid(S=S, sr=sr)
+    plt.figure(figsize=FIGURE_SIZE)
+    librosa.display.specshow(librosa.amplitude_to_db(S, ref=np.max), y_axis='log', x_axis='time')
+
+    times = librosa.frames_to_time(np.arange(spectral_centroid.shape[1]), sr=sr)
+    plt.plot(times, spectral_centroid[0], color='white', label='Spectral Centroid')
+
+    if not debug:
+        plt.axis("off")
+
+        # creating buffer and writing to the buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, bbox_inches="tight", pad_inches=0)
+        buf.seek(0)
+
+        # creating Image from buffer
+        img = Image.open(buf)
+        plt.close()
+        return img
+    else:
+        plt.title(f"Example SPECTRAL CENTROID Graph")
+        plt.colorbar(format="%+2.0f dB")
+        plt.savefig(path, bbox_inches="tight", pad_inches=0)
+        plt.close()
+        return None
+
 
 def get_type(name: str):
     """
@@ -173,6 +223,8 @@ def get_type(name: str):
         return STFT
     if name == MEL_SPEC.__name__:
         return MEL_SPEC
+    if name == SPEC_CENTROID.__name__:
+        return SPEC_CENTROID
 
     raise ValueError(f"Unknown signal processor: {name}")
 
@@ -180,4 +232,4 @@ def get_all_types():
     """
     :return: All signal processors as a list of their names
     """
-    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__]
+    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__, SPEC_CENTROID.__name__]
