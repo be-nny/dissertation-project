@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from . import signal_processor
 from . import utils
+from .utils import JobLogger
 
 class Preprocessor:
     def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, train_split=0.6, segment_duration=10):
@@ -26,6 +27,7 @@ class Preprocessor:
         self.dataset_dir = dataset_dir
         self.output_dir = output_dir
         self.logger = logger
+        self.job_logger = JobLogger()
 
         # creating output directory for preprocess data
         if not os.path.exists(self.output_dir):
@@ -54,6 +56,8 @@ class Preprocessor:
         self.target_length = target_length
 
         self.reader = utils.DatasetReader(self.dataset_dir, self.logger, train_split=train_split)
+
+        self.input_layer_dims = None
 
     def set_signal_processors(self, *signal_processors) -> Preprocessor:
         """
@@ -161,6 +165,8 @@ class Preprocessor:
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
                 self._create_hdf(path=file_name, layers=layers)
 
+                self.input_layer_dims = np.array(layers).shape
+
                 # properly discard the layers arr
                 del layers
 
@@ -183,13 +189,11 @@ class Preprocessor:
                     continue
         return self
 
-    def write_report(self):
-        pass
-
     def get_reader(self) -> utils.DatasetReader:
         """
         :return: The dataset reader
         """
+
         return self.reader
 
     def get_segment_duration(self) -> float:
@@ -203,12 +207,14 @@ class Preprocessor:
         """
         :return: The list of songs
         """
+
         return self.reader.files
 
     def get_signal_processors(self) -> list:
         """
         :return: A list of signal processors
         """
+
         return self._signal_processors
 
     def get_uuid_path(self) -> str:
@@ -237,3 +243,11 @@ class Preprocessor:
         """
 
         return self.preprocessed_path
+
+    def get_layer_dimensions(self) -> list:
+        """
+        Get the input layer dimensions
+
+        :return: input layer dimensions
+        """
+        return self.input_layer_dims
