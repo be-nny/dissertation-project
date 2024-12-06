@@ -65,9 +65,6 @@ class DatasetReader:
         sample_size = self._under_sample()
         self.logger.info(f"Genre sample size: {sample_size}")
 
-        with self.job_logger as jl:
-            jl.write("")
-
         self._test_train_split()
         self.logger.info(f"Train/Test split is {int(self.train_split*100)}:{(1-self.train_split)*100}")
 

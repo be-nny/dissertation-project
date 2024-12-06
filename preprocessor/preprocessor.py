@@ -27,7 +27,6 @@ class Preprocessor:
         self.dataset_dir = dataset_dir
         self.output_dir = output_dir
         self.logger = logger
-        self.job_logger = JobLogger()
 
         # creating output directory for preprocess data
         if not os.path.exists(self.output_dir):
@@ -250,4 +249,5 @@ class Preprocessor:
 
         :return: input layer dimensions
         """
+
         return self.input_layer_dims

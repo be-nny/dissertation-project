@@ -1,6 +1,6 @@
 # Music Analysis with Machine Learning
 
-## Music Analysis Tool (MAT) - Preprocessing
+## Music Analysis Tool (MAT) - **Preprocessing**
 This is responsible for preprocessing a dataset ready for processing. For preprocessing options, run:
 
 ```pycon
@@ -10,7 +10,7 @@ python mat_preprocessor.py --help
 alternatively see below:
 
 ```pycon    
-usage: Music Analysis Tool (MAT) - PREPROCESSOR [-h] -c CONFIG -s {CQT,STFT,MEL_SPEC} [{CQT,STFT,MEL_SPEC} ...] [-p] [-f FIGURES]
+usage: Music Analysis Tool (MAT) - PREPROCESSOR [-h] -c CONFIG -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...] [-p] [-f FIGURES]
 
 Preprocess Audio Dataset
 
@@ -18,7 +18,7 @@ options:
   -h, --help            show this help message and exit
   -c CONFIG, --config CONFIG
                         config file
-  -s {CQT,STFT,MEL_SPEC} [{CQT,STFT,MEL_SPEC} ...], --signal_processors {CQT,STFT,MEL_SPEC} [{CQT,STFT,MEL_SPEC} ...]
+  -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...], --signal_processors {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...]
                         the signal processors to apply to the raw audio
   -p, --process         preprocesses data the data use the parameters set in the config file
   -f FIGURES, --figures FIGURES
