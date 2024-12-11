@@ -1,7 +1,5 @@
 import os
 import random
-from typing import TextIO
-
 import audio_metadata
 import librosa
 
@@ -43,12 +41,16 @@ def get_song_metadata(path: str) -> str:
 
 
 class DatasetReader:
+    """
+    Responsible for opening a dataset directory, removing any 'broken files', under-sampling, and creating
+    a test/train split.
+    """
+
     def __init__(self, dataset_dir, logger, train_split=0.6):
         self.dataset_dir = dataset_dir
         self.logger = logger
         self.files = []
         self.current = 0
-
         self.train_split = train_split
 
         self.logger.info("Reading dataset files")
@@ -109,6 +111,11 @@ class DatasetReader:
         return min_val
 
     def _test_train_split(self):
+        """
+        Creates a test/train split using the split value in the config.yml file.
+
+        :return: None
+        """
         files_dict = {}
         for path, genre in self.files:
             if genre.lower() not in files_dict:
@@ -126,6 +133,12 @@ class DatasetReader:
             self.test_train_split.update({genre: {"train": files[:train_num], "test": files[train_num+1:]}})
 
     def generate(self):
+        """
+        A generator for getting all the files in the dataset.
+
+        :return: if its a test or train sample, the path, and the genre
+        """
+
         for genre, splits in self.test_train_split.items():
             train = splits["train"]
             test = splits["test"]
@@ -136,6 +149,12 @@ class DatasetReader:
             for path in test:
                 yield "test", path, genre
 
+    def get_total_genres(self):
+        """
+        :return: All the genre tags as a list
+        """
+        return self.files_dict.keys()
+
     def __enter__(self):
         return self
 
@@ -145,16 +164,23 @@ class DatasetReader:
     def __len__(self):
         return self.total_length
 
-class JobLogger:
+class ReceiptWriter:
+    """
+    Responsible for writing a receipt file typically after preprocessing has been complete.
+    """
+
     def __init__(self, uuid_path):
+        """
+        :param uuid_path: path to receipt file
+        """
+
         self.uuid_path = uuid_path
-        self.job_log_book = os.path.join(self.uuid_path, "job_log.json")
+        self.job_log_book = os.path.join(self.uuid_path, "receipt.json")
         self.file = None
 
-    def __enter__(self) -> TextIO:
-        with open(self.job_log_book, "w") as f:
-            self.file = f
-            return self.file
+    def __enter__(self):
+        self.file = open(self.job_log_book, 'w', encoding='utf-8')
+        return self.file
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.file.close()

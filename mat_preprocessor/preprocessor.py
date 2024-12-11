@@ -1,3 +1,5 @@
+import datetime
+import json
 import os
 import uuid
 import h5py
@@ -12,7 +14,6 @@ from tqdm import tqdm
 
 from . import signal_processor
 from . import utils
-from .utils import JobLogger
 
 class Preprocessor:
     def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, train_split=0.6, segment_duration=10):
@@ -28,14 +29,17 @@ class Preprocessor:
         self.output_dir = output_dir
         self.logger = logger
 
+        self.start_datetime = None
+        self.end_time = None
+
         # creating output directory for preprocess data
         if not os.path.exists(self.output_dir):
             os.mkdir(self.output_dir)
 
         # create unique dir name
-        new_dir_name = str(uuid.uuid4().hex)[:6]
-        self.logger.info(f"'{new_dir_name}' created")
-        self.uuid_path = os.path.join(self.output_dir, new_dir_name)
+        self.uuid = str(uuid.uuid4().hex)[:6]
+        self.logger.info(f"'{self.uuid}' created")
+        self.uuid_path = os.path.join(self.output_dir, self.uuid)
         os.mkdir(self.uuid_path)
 
         # adding 'train' to output path
@@ -82,8 +86,6 @@ class Preprocessor:
             for key, data in kwargs.items():
                 hdf5_file.create_dataset(key, data=data)
 
-            hdf5_file.close()
-
     def _normalise_length(self, wave, sr):
         """
         Normalise the length of a waveform so that it is the same length as the target length
@@ -119,7 +121,7 @@ class Preprocessor:
         wave_normalised = wave * scale_factor
         return wave_normalised
 
-    def process(self, path: str, genre: str, split_type: str) -> None:
+    def _process(self, path: str, genre: str, split_type: str) -> None:
         """
         Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
 
@@ -162,7 +164,7 @@ class Preprocessor:
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
-                self._create_hdf(path=file_name, layers=layers)
+                self._create_hdf(path=file_name, layers=layers, genre=genre)
 
                 self.input_layer_dims = np.array(layers).shape
 
@@ -171,36 +173,63 @@ class Preprocessor:
 
                 count += 1
 
-    def preprocess(self) -> None:
+    def preprocess(self):
         """
-        Preprocesses the dataset
+        Preprocesses the dataset with the specified configuration file
         """
 
         self.logger.info("Preprocessing dataset...")
+        self.start_datetime = datetime.datetime.now()
 
         with self.reader as r:
             for split_type, file, genre in tqdm(r.generate(), desc="Generating Spectra", total=len(self.reader), unit="file"):
                 try:
-                    self.process(file, genre, split_type)
+                    self._process(file, genre, split_type)
                 except NoBackendError:
                     self.logger.warning(
                         f"Could not read file '{file}' with META DATA `{utils.get_song_metadata(path=file)}' skipping")
                     continue
-        return self
 
-    def get_reader(self) -> utils.DatasetReader:
+        # write receipt file
+        self.write_receipt()
+
+    def write_receipt(self):
         """
-        :return: The dataset reader
+        Writes a receipt file after preprocessing is complete
+
+        :return:
+        """
+
+        self.logger.info("Writing receipt...")
+
+        json_data = {
+            "uuid": self.uuid,
+            "genres": self.reader.get_total_genres(),
+            "start_time": str(self.start_datetime),
+            "end_time": str(datetime.datetime.now()),
+            "preprocessor_info": {
+                "signal_processors": self._signal_processors,
+                "segment_duration": self.segment_duration,
+                "target_length": self.target_length,
+                "total_samples": len(self.reader)
+            }
+        }
+
+        with utils.ReceiptWriter(self.uuid_path) as writer:
+            json.dump(
+                json_data,
+                writer,
+                sort_keys=True,
+                indent=4,
+                ensure_ascii=False
+            )
+
+    def get_dataset_reader(self):
+        """
+        :return: Dataset reader
         """
 
         return self.reader
-
-    def get_segment_duration(self) -> float:
-        """
-        :return: The length in seconds for each segment
-        """
-
-        return self.segment_duration
 
     def get_songs(self) -> list:
         """
@@ -216,15 +245,6 @@ class Preprocessor:
 
         return self._signal_processors
 
-    def get_uuid_path(self) -> str:
-        """
-        Get the current UUID path
-
-        :return: UUID path
-        """
-
-        return self.uuid_path
-
     def get_figures_path(self) -> str:
         """
         Get the figures path
@@ -233,21 +253,3 @@ class Preprocessor:
         """
 
         return self.figures_path
-
-    def get_preprocessed_path(self) -> str:
-        """
-        Get the preprocessed path
-
-        :return: preprocessed path
-        """
-
-        return self.preprocessed_path
-
-    def get_layer_dimensions(self) -> list:
-        """
-        Get the input layer dimensions
-
-        :return: input layer dimensions
-        """
-
-        return self.input_layer_dims

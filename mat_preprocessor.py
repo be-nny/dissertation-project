@@ -1,9 +1,9 @@
 import argparse
 import yaml
 
-from preprocessor import preprocessor as p
-from preprocessor import utils as pu
-from preprocessor.signal_processor import get_type, get_all_types
+from mat_preprocessor import preprocessor as p
+from mat_preprocessor import utils as pu
+from mat_preprocessor.signal_processor import get_type, get_all_types
 from jsonschema import validate
 from mat_logger import mat_logger
 
