@@ -6,7 +6,7 @@ from mat_preprocessor import utils as pu
 from mat_preprocessor.signal_processor import get_type, get_all_types
 from jsonschema import validate
 from mat_logger import mat_logger
-
+import mat_config
 # arguments parser
 parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - PREPROCESSOR', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="config file")
@@ -20,21 +20,7 @@ if __name__ == "__main__":
 
     # load config file
     if args.config:
-        with open(args.config, 'r') as f:
-            yml_data = yaml.load(f, Loader=yaml.FullLoader)
-
-        # validating schema
-        with open("schema.yml", 'r') as schema:
-            validate(yml_data, yaml.load(schema, Loader=yaml.FullLoader))
-
-        dataset_path = yml_data["dataset"]
-        output_path = yml_data["output"]
-        target_length = yml_data["preprocessor_config"]["target_length"]
-        segment_duration = yml_data["preprocessor_config"]["segment_duration"]
-        train_split = yml_data["preprocessor_config"]["train_split"]
-
-        if train_split > 1:
-            raise ValueError("'train_split' must be <= 1")
+        config = mat_config.Config(path=args.config)
 
     # get signal processor args
     signal_processors = []
@@ -48,7 +34,7 @@ if __name__ == "__main__":
                 raise e
 
     # creating a preprocessor
-    preprocessor = p.Preprocessor(dataset_dir=dataset_path, target_length=target_length, segment_duration=segment_duration, output_dir=output_path, logger=logger, train_split=train_split).set_signal_processors(*signal_processors)
+    preprocessor = p.Preprocessor(dataset_dir=config.DATASET_PATH, target_length=config.TARGET_LENGTH, segment_duration=config.SEGMENT_DURATION, output_dir=config.OUTPUT_PATH, logger=logger, train_split=config.TRAIN_SPLIT).set_signal_processors(*signal_processors)
 
     # create examples
     if args.figures:
