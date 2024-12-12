@@ -155,17 +155,15 @@ class Preprocessor:
                 if len(segment) == 0:
                     break
 
-                # generate the different audio spectra graphs
+                # generate the different audio spectra data and merge it into an array
                 layers = []
                 for func in self._signal_processors:
-                    img = func(segment, sr)
-                    arr = np.asarray(img)
-                    layers.append(arr)
+                    signal = np.array(func(segment, sr)).flatten()
+                    layers.extend(signal)
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
                 self._create_hdf(path=file_name, layers=layers, genre=genre)
-
                 self.input_layer_dims = np.array(layers).shape
 
                 # properly discard the layers arr
@@ -208,21 +206,16 @@ class Preprocessor:
             "start_time": str(self.start_datetime),
             "end_time": str(datetime.datetime.now()),
             "preprocessor_info": {
-                "signal_processors": self._signal_processors,
                 "segment_duration": self.segment_duration,
                 "target_length": self.target_length,
-                "total_samples": len(self.reader)
+                "total_samples": len(self.reader) * int(self.target_length / self.segment_duration),
             }
         }
 
-        with utils.ReceiptWriter(self.uuid_path) as writer:
-            json.dump(
-                json_data,
-                writer,
-                sort_keys=True,
-                indent=4,
-                ensure_ascii=False
-            )
+        receipt_path = os.path.join(self.uuid_path, "receipt.json")
+
+        with open(receipt_path, 'w') as f:
+            json.dump(json_data, f)
 
     def get_dataset_reader(self):
         """

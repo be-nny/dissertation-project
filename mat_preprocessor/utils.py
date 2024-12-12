@@ -153,7 +153,7 @@ class DatasetReader:
         """
         :return: All the genre tags as a list
         """
-        return self.files_dict.keys()
+        return list(self.files_dict.keys())
 
     def __enter__(self):
         return self
@@ -163,25 +163,3 @@ class DatasetReader:
 
     def __len__(self):
         return self.total_length
-
-class ReceiptWriter:
-    """
-    Responsible for writing a receipt file typically after preprocessing has been complete.
-    """
-
-    def __init__(self, uuid_path):
-        """
-        :param uuid_path: path to receipt file
-        """
-
-        self.uuid_path = uuid_path
-        self.job_log_book = os.path.join(self.uuid_path, "receipt.json")
-        self.file = None
-
-    def __enter__(self):
-        self.file = open(self.job_log_book, 'w', encoding='utf-8')
-        return self.file
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.file.close()
-

@@ -2,7 +2,6 @@ import yaml
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
-
 class Config:
     def __init__(self, path):
         self.path = path

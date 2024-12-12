@@ -1,9 +1,7 @@
-import io
 import librosa
 import matplotlib
 import numpy as np
 
-from PIL import Image
 from matplotlib import pyplot as plt
 from scipy import signal
 
@@ -53,10 +51,12 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     This a method for analyzing how the frequency content of a signal changes over time.
     The initial signal is broken down into small discrete samples of time before having a Fourier Transform applied to it.
 
+
     :param wave: raw audio data
     :param sr: sample rate
     :param path: output path, default to None
-    :return: stft as an image array
+    :param debug: debug mode, default to False. If true, an example figure will be saved
+    :return: 2D complex-valued array representing the STFT result. Each element corresponds to the Fourier coefficient at a particular frequency (row index) and time (column index).
     """
 
     # if the length of the wav is smaller than the window function, stop
@@ -64,26 +64,13 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     if len(wave) < nperseg:
         return
 
-    f, t, Zxx = signal.stft(wave, fs=sr, nperseg=nperseg)
-
-    # plot the stft
-    plt.figure(figsize=FIGURE_SIZE)
-    plt.pcolormesh(t, f, np.abs(Zxx), shading='gouraud')
-    plt.ylim(0, 5000)
+    f, t, transform = signal.stft(wave, fs=sr, nperseg=nperseg)
 
     if not debug:
-        plt.axis("off")
-        # creating buffer and writing to the buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, bbox_inches="tight", pad_inches=0)
-        buf.seek(0)
-
-        # creating Image from buffer
-        img = Image.open(buf)
-        plt.close()
-        return img
-
+        return transform
     else:
+        plt.figure(figsize=FIGURE_SIZE)
+        plt.pcolormesh(t, f, np.abs(transform), shading='gouraud')
         plt.title("Example STFT Graph")
         plt.colorbar(format="%+2.0f dB")
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
@@ -99,8 +86,8 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
     :param wave: raw audio data
     :param sr: sample rate
     :param path: output path, default to None
-    :param debug: debug mode, default to False
-    :return: mel spectrogram as an image array
+    :param debug: debug mode, default to False. If true, an example figure will be saved
+    :return: mel spectrogram on a logarithmic scale
     """
 
     # if the length of the wav is smaller than the window function, stop
@@ -109,24 +96,16 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
         return
 
     mel_spectrogram = librosa.feature.melspectrogram(y=wave, sr=sr, n_fft=n_fft, hop_length=512, n_mels=128)
+
+    # this converts the power values to a logarithmic scale since humans perceive loudness this way
     mel_spectrogram_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
 
-    # Plot the Mel spectrogram
-    plt.figure(figsize=FIGURE_SIZE)
-    librosa.display.specshow(mel_spectrogram_db, sr=sr, hop_length=512, x_axis='time', y_axis='mel')
     if not debug:
-        plt.axis("off")
-
-        # creating buffer and writing to the buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, bbox_inches="tight", pad_inches=0)
-        buf.seek(0)
-
-        # creating Image from buffer
-        img = Image.open(buf)
-        plt.close()
-        return img
+        return mel_spectrogram_db
     else:
+        # Plot the Mel spectrogram
+        plt.figure(figsize=FIGURE_SIZE)
+        librosa.display.specshow(mel_spectrogram_db, sr=sr, hop_length=512, x_axis='time', y_axis='mel')
         plt.title(f"Example MEL_SPEC Graph")
         plt.colorbar(format="%+2.0f dB")
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
@@ -147,67 +126,21 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
     :return: cqt as an image array
     """
 
-    C = np.abs(librosa.cqt(wav, sr=sr))
-    plt.figure(figsize=FIGURE_SIZE)
-    librosa.display.specshow(librosa.amplitude_to_db(C, ref=np.max), sr=sr, x_axis='time', y_axis='cqt_note')
+    cqt_transform = np.abs(librosa.cqt(wav, sr=sr))
+
+    # converted to a logarithmic scale
+    cqt_transform_db = librosa.amplitude_to_db(cqt_transform, ref=np.max)
+
     if not debug:
-        plt.axis("off")
-
-        # creating buffer and writing to the buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, bbox_inches="tight", pad_inches=0)
-        buf.seek(0)
-
-        # creating Image from buffer
-        img = Image.open(buf)
-        plt.close()
-        return img
+        return cqt_transform_db
     else:
+        plt.figure(figsize=FIGURE_SIZE)
+        librosa.display.specshow(cqt_transform_db, sr=sr, x_axis='time', y_axis='cqt_note')
         plt.title(f"Example CQT Graph")
         plt.colorbar(format="%+2.0f dB")
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
         plt.close()
         return None
-
-def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
-    """
-    Generate a spectral centroid of the audio file.
-    A spectral centroid is the location of the centre of mass of the spectrum.
-
-    :param wav: raw audio data
-    :param sr: sample rate
-    :param path: output path, default to None
-    :param debug: debug mode, default to False
-    :return: spectral centroid as an image array
-    """
-
-    S, _ = librosa.magphase(librosa.stft(y=wav))
-    spectral_centroid = librosa.feature.spectral_centroid(S=S, sr=sr)
-    plt.figure(figsize=FIGURE_SIZE)
-    librosa.display.specshow(librosa.amplitude_to_db(S, ref=np.max), y_axis='log', x_axis='time')
-
-    times = librosa.frames_to_time(np.arange(spectral_centroid.shape[1]), sr=sr)
-    plt.plot(times, spectral_centroid[0], color='white', label='Spectral Centroid')
-
-    if not debug:
-        plt.axis("off")
-
-        # creating buffer and writing to the buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, bbox_inches="tight", pad_inches=0)
-        buf.seek(0)
-
-        # creating Image from buffer
-        img = Image.open(buf)
-        plt.close()
-        return img
-    else:
-        plt.title(f"Example SPECTRAL CENTROID Graph")
-        plt.colorbar(format="%+2.0f dB")
-        plt.savefig(path, bbox_inches="tight", pad_inches=0)
-        plt.close()
-        return None
-
 
 def get_type(name: str):
     """
@@ -223,8 +156,6 @@ def get_type(name: str):
         return STFT
     if name == MEL_SPEC.__name__:
         return MEL_SPEC
-    if name == SPEC_CENTROID.__name__:
-        return SPEC_CENTROID
 
     raise ValueError(f"Unknown signal processor: {name}")
 
@@ -232,4 +163,4 @@ def get_all_types():
     """
     :return: All signal processors as a list of their names
     """
-    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__, SPEC_CENTROID.__name__]
+    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__]
