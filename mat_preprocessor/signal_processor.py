@@ -56,7 +56,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     :param sr: sample rate
     :param path: output path, default to None
     :param debug: debug mode, default to False. If true, an example figure will be saved
-    :return: 2D complex-valued array representing the STFT result. Each element corresponds to the Fourier coefficient at a particular frequency (row index) and time (column index).
+    :return: an array of magnitudes of each complex value in the Short-Time Fourier Transform (STFT) result.
     """
 
     # if the length of the wav is smaller than the window function, stop
@@ -67,7 +67,9 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     f, t, transform = signal.stft(wave, fs=sr, nperseg=nperseg)
 
     if not debug:
-        return transform
+        # transform contains complex values, the complex components contain phase
+        # information - taking the magnitude results in only amplitude.
+        return np.abs(transform)
     else:
         plt.figure(figsize=FIGURE_SIZE)
         plt.pcolormesh(t, f, np.abs(transform), shading='gouraud')

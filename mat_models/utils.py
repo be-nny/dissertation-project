@@ -58,7 +58,7 @@ class Loader:
 
         for i in range(0, len(split)):
             with (h5py.File(split[i], "r") as hdf_file):
-                layers = hdf_file["layers"]
+                layers = np.array(hdf_file["layers"]).flatten()
                 b_genre = hdf_file["genre"][()]
                 genre = b_genre.decode("utf-8")
                 out.append([layers, genre])

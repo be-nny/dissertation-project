@@ -10,7 +10,6 @@ from . import utils
 
 matplotlib.use('Agg')
 
-
 class PCAModel:
     def __init__(self, out: str, uuid: str, n_components, loader: utils.Loader, logger: logging.Logger):
         self.out = out
@@ -24,7 +23,7 @@ class PCAModel:
 
     def create(self):
         self.logger.info("Creating PCA model...")
-        data = self.loader.get_data(split_type='train')
-        data.extend(self.loader.get_data(split_type='test'))
+        data = [item[0] for item in self.loader.get_data(split_type='train')]
+        data.extend([item[0] for item in self.loader.get_data(split_type='test')])
 
         self.pca.fit(data)
