@@ -13,7 +13,7 @@ parser.add_argument("-p", "--process", action="store_true", help="preprocesses d
 parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="create a set of n example figures")
 
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parser.parse_args(["--config=config.yml", "--signal_processors", "MEL_SPEC", "CQT", "-p"])
     logger = mat_logger.get_logger()
 
     # load config file

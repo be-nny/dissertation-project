@@ -59,7 +59,7 @@ class Preprocessor:
         self.target_length = target_length
 
         self.reader = utils.DatasetReader(self.dataset_dir, self.logger, train_split=train_split)
-
+        self.total = 0
         self.input_layer_dims = None
 
     def set_signal_processors(self, *signal_processors) -> Preprocessor:
@@ -158,8 +158,8 @@ class Preprocessor:
                 # generate the different audio spectra data and merge it into an array
                 layers = []
                 for func in self._signal_processors:
-                    signal = np.array(func(segment, sr)).flatten()
-                    layers.extend(signal)
+                    raw_signal = func(segment, sr)
+                    layers.extend(raw_signal)
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
@@ -168,7 +168,7 @@ class Preprocessor:
 
                 # properly discard the layers arr
                 del layers
-
+                self.total += 1
                 count += 1
 
     def preprocess(self):
@@ -208,7 +208,8 @@ class Preprocessor:
             "preprocessor_info": {
                 "segment_duration": self.segment_duration,
                 "target_length": self.target_length,
-                "total_samples": len(self.reader) * int(self.target_length / self.segment_duration),
+                "total_samples": self.total,
+                "signal_processors": [str(sp.__name__) for sp in self._signal_processors]
             }
         }
 

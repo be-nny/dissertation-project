@@ -2,6 +2,9 @@ import json
 import os
 import h5py
 import numpy as np
+from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
+
 
 class ReceiptReader:
     def __init__(self, filename):
@@ -43,9 +46,20 @@ class Loader:
                 for song in songs:
                     if not song.startswith("."):
                         split.append(os.path.join(genre_path, song))
+
+        np.random.shuffle(split)
         return split
 
-    def get_data(self, split_type):
+    def get_data(self):
+        data, genre_labels = self.get_data_split(split_type='train')
+        tmp_d, tmp_g = self.get_data_split(split_type='test')
+
+        data.extend(tmp_d)
+        genre_labels.extend(tmp_g)
+
+        return data, genre_labels
+
+    def get_data_split(self, split_type):
         if split_type == "test":
             split = self.test_split
         elif split_type == "train":
@@ -53,38 +67,27 @@ class Loader:
         else:
             raise ValueError("split_type must be either 'train' or 'test'")
 
-        np.random.shuffle(split)
-        out = []
+        layer_data = []
+        genre_labels = []
 
-        for i in range(0, len(split)):
+        for i in tqdm(range(0, len(split)), unit="file", desc=f"Loading {split_type} data from '{self.uuid}'"):
             with (h5py.File(split[i], "r") as hdf_file):
                 layers = np.array(hdf_file["layers"]).flatten()
                 b_genre = hdf_file["genre"][()]
                 genre = b_genre.decode("utf-8")
-                out.append([layers, genre])
 
-        return out
+                # removing any nan values
+                layers = np.nan_to_num(layers, nan=0.0, posinf=1e9, neginf=-1e9)
 
-    def get_batch(self, split_type: str, batch_size=10):
-        if split_type == "test":
-            return self._make_batch(split_arr=self.test_split, batch_size=batch_size)
-        elif split_type == "train":
-            return self._make_batch(split_arr=self.train_split, batch_size=batch_size)
+                layer_data.append(layers)
+                genre_labels.append(genre)
 
-    def _make_batch(self, split_arr: list, batch_size: int):
-        np.random.shuffle(split_arr)
-        for i in range(0, len(split_arr), batch_size):
-            arr = split_arr[i:i + batch_size]
-            data_batch, genre_batch = [], []
+                hdf_file.close()
 
-            for split in arr:
-                with (h5py.File(split, "r") as hdf_file):
-                    data_batch.append(np.array(hdf_file["layers"]).flatten())
-                    b_genre = hdf_file["genre"][()]
-                    genre = b_genre.decode("utf-8")
-                    genre_batch.append(genre)
-
-            yield data_batch, genre_batch
+        return layer_data, genre_labels
 
     def get_genres(self):
         return self.genres
+
+    def get_directory(self):
+        return self.root
