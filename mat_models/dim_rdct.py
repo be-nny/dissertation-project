@@ -24,6 +24,13 @@ class PCAModel(IncrementalPCA):
         self.embeddings = None
 
     def create(self):
+        """
+        Fits the data using PCA via `partial_fit` to batch load the data. This is saved
+        in the 'figures/' directory in the UUID path provided.
+
+        :return: Current instance
+        """
+
         self.logger.info("Generating PCA Model...")
         self.partial_fit(self.data)
         self.embeddings = self.transform(self.data)
@@ -31,11 +38,19 @@ class PCAModel(IncrementalPCA):
         return self
 
     def get_embeddings(self):
+        """
+        :return: The embeddings after PCA has been applied
+        """
+
         self.embeddings = np.clip(self.embeddings, -1e10, 1e10)
 
         return self.embeddings
 
     def visualise(self):
+        """
+        Plots the eigenvalues on a logarithmic scale agains the number of PCA components.
+        """
+
         path = os.path.join(self.figures_path, "eigenvalues.pdf")
         plt.figure(figsize=(10, 10))
         plt.plot(range(1, len(self.explained_variance_) + 1), self.explained_variance_, marker='o', linestyle='--')
@@ -59,12 +74,22 @@ class UmapModel(umap.UMAP):
         self.figures_path = figures_path
 
     def create(self):
+        """
+        Fits the data using UMAP.
+        :return: Current object
+        """
+
         self.logger.info("Generating UMAP Model...")
         self.embeddings = self.fit_transform(self.data)
 
         return self
 
     def visualise(self):
+        """
+        Plots a Graph using UMAPs underlying knn graph to understand the relationship between the
+        features in the dataset. This is saved in the 'figures/' directory in the UUID path provided.
+        """
+
         path = os.path.join(self.figures_path, "umap.pdf")
         G = nx.Graph(self.graph_)
         plt.figure(figsize=(8, 8))
