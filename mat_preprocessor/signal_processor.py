@@ -60,7 +60,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     """
 
     # if the length of the wav is smaller than the window function, stop
-    nperseg = 256
+    nperseg = 8192
     if len(wave) < nperseg:
         return
 
@@ -69,7 +69,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     if not debug:
         # transform contains complex values, the complex components contain phase
         # information - taking the magnitude results in only amplitude.
-        return np.abs(transform)
+        return list(np.abs(transform))
     else:
         plt.figure(figsize=FIGURE_SIZE)
         plt.pcolormesh(t, f, np.abs(transform), shading='gouraud')
@@ -144,6 +144,35 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
         plt.close()
         return None
 
+def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
+    """
+    Generate a spectral centroid of the audio file.
+    A spectral centroid is the location of the centre of mass of the spectrum.
+
+    :param wav: raw audio data
+    :param sr: sample rate
+    :param path: output path, default to None
+    :param debug: debug mode, default to False
+    :return: spectral centroid as an image array
+    """
+
+    S, _ = librosa.magphase(librosa.stft(y=wav))
+    spectral_centroid = librosa.feature.spectral_centroid(S=S, sr=sr)
+
+    if not debug:
+        return spectral_centroid
+    else:
+        plt.figure(figsize=FIGURE_SIZE)
+        plt.title(f"Example SPECTRAL CENTROID Graph")
+        librosa.display.specshow(librosa.amplitude_to_db(S, ref=np.max), y_axis='log', x_axis='time')
+        times = librosa.frames_to_time(np.arange(spectral_centroid.shape[1]), sr=sr)
+
+        plt.plot(times, spectral_centroid[0], color='white', label='Spectral Centroid')
+        plt.colorbar(format="%+2.0f dB")
+        plt.savefig(path, bbox_inches="tight", pad_inches=0)
+        plt.close()
+        return None
+
 def get_type(name: str):
     """
     Returns the function signature from a given name of a signal processor
@@ -158,6 +187,8 @@ def get_type(name: str):
         return STFT
     if name == MEL_SPEC.__name__:
         return MEL_SPEC
+    if name == SPEC_CENTROID.__name__:
+        return SPEC_CENTROID
 
     raise ValueError(f"Unknown signal processor: {name}")
 
@@ -165,4 +196,4 @@ def get_all_types():
     """
     :return: All signal processors as a list of their names
     """
-    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__]
+    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__, SPEC_CENTROID.__name__]

@@ -113,6 +113,7 @@ class Preprocessor:
         sound across all sources.
 
         :param wave: input wave
+        :param rms: rms level in dB
         :return: normalised wave
         """
 
@@ -159,6 +160,8 @@ class Preprocessor:
                 layers = []
                 for func in self._signal_processors:
                     raw_signal = func(segment, sr)
+                    raw_signal = np.array(raw_signal).flatten()
+
                     layers.extend(raw_signal)
 
                 # save the layers to HDF5 file

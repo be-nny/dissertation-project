@@ -4,7 +4,7 @@ from mat_preprocessor import utils as pu
 from mat_preprocessor.signal_processor import get_type, get_all_types
 from mat_logger import mat_logger
 
-import mat_config
+import config
 # arguments parser
 parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - PREPROCESSOR', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="config file")
@@ -13,12 +13,13 @@ parser.add_argument("-p", "--process", action="store_true", help="preprocesses d
 parser.add_argument("-f", "--figures", action="store", default=1, type=int, help="create a set of n example figures")
 
 if __name__ == "__main__":
-    args = parser.parse_args(["--config=config.yml", "--signal_processors", "MEL_SPEC", "CQT", "-p"])
+    # ["--config=config.yml", "--signal_processors", "MEL_SPEC", "CQT", "STFT", "SPEC_CENTROID","-p"]
+    args = parser.parse_args()
     logger = mat_logger.get_logger()
 
     # load config file
     if args.config:
-        config = mat_config.Config(path=args.config)
+        config = config.Config(path=args.config)
 
     # get signal processor args
     signal_processors = []

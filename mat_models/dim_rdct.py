@@ -1,9 +1,11 @@
 import logging
 import os
+import uuid
+
 import matplotlib
 import networkx as nx
 import numpy as np
-import umap
+import umap.umap_ as umap
 
 from matplotlib import pyplot as plt
 from sklearn.decomposition import IncrementalPCA
@@ -46,12 +48,13 @@ class PCAModel(IncrementalPCA):
 
         return self.embeddings
 
-    def visualise(self):
+    def visualise(self, path=None):
         """
         Plots the eigenvalues on a logarithmic scale agains the number of PCA components.
         """
+        if path is None:
+            path = os.path.join(self.figures_path, "eigenvalues.pdf")
 
-        path = os.path.join(self.figures_path, "eigenvalues.pdf")
         plt.figure(figsize=(10, 10))
         plt.plot(range(1, len(self.explained_variance_) + 1), self.explained_variance_, marker='o', linestyle='--')
         plt.yscale('log')
@@ -60,13 +63,15 @@ class PCAModel(IncrementalPCA):
         plt.ylabel('Eigenvalue (Log Scale)')
         plt.grid(True)
         plt.savefig(path)
-
+        plt.close()
         self.logger.info(f"saved '{path}'")
 
 
 class UmapModel(umap.UMAP):
     def __init__(self, data: list, genre_labels: list, logger: logging.Logger, figures_path: str, **kwargs):
         super().__init__(**kwargs)
+        self.kwargs = kwargs
+
         self.data = data
         self.genre_labels = genre_labels
         self.embeddings = None
@@ -84,18 +89,25 @@ class UmapModel(umap.UMAP):
 
         return self
 
-    def visualise(self):
+    def visualise(self, path=None):
         """
         Plots a Graph using UMAPs underlying knn graph to understand the relationship between the
         features in the dataset. This is saved in the 'figures/' directory in the UUID path provided.
         """
+        id = str(uuid.uuid4().hex)[:6]
 
-        path = os.path.join(self.figures_path, "umap.pdf")
+        if path is None:
+            path = os.path.join(self.figures_path, f"umap_{id}.pdf")
+
         G = nx.Graph(self.graph_)
         plt.figure(figsize=(8, 8))
+        plt.title(', '.join(str(f"{k}:{v}") for k, v in self.kwargs.items()))
+
         nx.draw(G, node_size=10, alpha=0.5)
         plt.savefig(path)
-
+        plt.close()
         self.logger.info(f"saved '{path}'")
 
+    def get_embeddings(self):
+        return self.embeddings
 

@@ -1,20 +1,24 @@
 import json
+import logging
 import os
 import h5py
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
-
+import torch
+from sklearn.preprocessing import LabelEncoder
+from torch.utils.data import TensorDataset, DataLoader
 
 class ReceiptReader:
     def __init__(self, filename):
         self.filename = filename
         self.genres = []
+        self.signal_processors = []
 
     def __enter__(self):
         with open(self.filename, 'r') as f:
             data = json.load(f)
             self.genres = data['genres']
+            self.signal_processors = data['preprocessor_info']['signal_processors']
 
         return self
 
@@ -22,9 +26,11 @@ class ReceiptReader:
         return
 
 class Loader:
-    def __init__(self, uuid: str, out: str):
+    def __init__(self, uuid: str, out: str, logger: logging.Logger):
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
+        self.logger = logger
+        self.input_size = None
 
         # creating the test/train arrays
         self.test_split = self._make_splits(split_type="test")
@@ -35,6 +41,9 @@ class Loader:
 
         with ReceiptReader(filename=os.path.join(self.root, 'receipt.json')) as receipt:
             self.genres = receipt.genres
+            self.signal_processors = receipt.signal_processors
+
+        self.logger.info(f"'{self.uuid}' applied with {', '.join(self.signal_processors)}")
 
     def _make_splits(self, split_type: str) -> list:
         split = []
@@ -50,6 +59,9 @@ class Loader:
         np.random.shuffle(split)
         return split
 
+    def get_input_size(self):
+        return self.input_size
+
     def get_data(self):
         data, genre_labels = self.get_data_split(split_type='train')
         tmp_d, tmp_g = self.get_data_split(split_type='test')
@@ -58,6 +70,24 @@ class Loader:
         genre_labels.extend(tmp_g)
 
         return data, genre_labels
+
+    def get_dataloader(self, split_type: str):
+        data, labels = self.get_data_split(split_type=split_type)
+
+        data = np.array(data)
+
+        label_encoder = LabelEncoder()
+        int_labels = label_encoder.fit_transform(labels)
+
+        data_tensor = torch.tensor(data, dtype=torch.float32)
+        labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
+
+        dataset = TensorDataset(data_tensor, labels_tensor)
+        dataloader = DataLoader(dataset, batch_size=512, shuffle=True)
+
+        self.input_size = np.array(data[0]).shape[0]
+
+        return dataloader
 
     def get_data_split(self, split_type):
         if split_type == "test":
@@ -91,3 +121,6 @@ class Loader:
 
     def get_directory(self):
         return self.root
+
+    def get_figures_path(self):
+        return os.path.join(self.root, 'figures')
