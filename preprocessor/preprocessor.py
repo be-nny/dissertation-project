@@ -107,6 +107,20 @@ class Preprocessor:
 
         return wave
 
+    def _dec_normalise(self, layer_data: np.array):
+        """
+        Normalise values so that the largest feature is less than 1.
+        :param layer_data: dataset to normalise
+        :return: normalised dataset
+        """
+
+        max_val = np.max(np.abs(layer_data))
+        if max_val == 0:
+            max_val = 1
+        layer_data = layer_data / max_val
+
+        return layer_data
+
     def _rms_normalise_audio(self, wave, rms=0.1):
         """
         Root Mean Squared (RMS) audio normalisation. Balances the perceived loudness to create a cohesive
@@ -162,6 +176,8 @@ class Preprocessor:
                     raw_signal = func(segment, sr)
                     raw_signal = np.array(raw_signal).flatten()
 
+                    # normalise values to be between 1 and -1
+                    raw_signal = self._dec_normalise(raw_signal)
                     layers.extend(raw_signal)
 
                 # save the layers to HDF5 file

@@ -1,12 +1,16 @@
 import json
-import logging
 import os
 import h5py
+import matplotlib
 import numpy as np
 from tqdm import tqdm
 import torch
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
+
+from matplotlib import pyplot as plt
+
+matplotlib.use('TkAgg')
 
 class ReceiptReader:
     def __init__(self, filename):
@@ -26,7 +30,7 @@ class ReceiptReader:
         return
 
 class Loader:
-    def __init__(self, uuid: str, out: str, logger: logging.Logger):
+    def __init__(self, uuid: str, out: str, logger):
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
         self.logger = logger
@@ -71,7 +75,7 @@ class Loader:
 
         return data, genre_labels
 
-    def get_dataloader(self, split_type: str):
+    def get_dataloader(self, split_type: str, batch_size: int = 512):
         data, labels = self.get_data_split(split_type=split_type)
 
         data = np.array(data)
@@ -83,13 +87,21 @@ class Loader:
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
 
         dataset = TensorDataset(data_tensor, labels_tensor)
-        dataloader = DataLoader(dataset, batch_size=512, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
         self.input_size = np.array(data[0]).shape[0]
 
         return dataloader
 
     def get_data_split(self, split_type):
+        """
+        This returns a shuffled dataset containing either test or train data from a dataset. This returns an array
+        (num_samples, num_features) that are normalised using decimal scaling, and the genre tags (num_samples,) as
+        strings.
+        :param split_type: return an array that contains either test or train data
+        :return: dataset, genres
+        """
+
         if split_type == "test":
             split = self.test_split
         elif split_type == "train":
@@ -124,3 +136,24 @@ class Loader:
 
     def get_figures_path(self):
         return os.path.join(self.root, 'figures')
+
+def plot_3d(space, labels):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Scatter plot with labels as colors
+    scatter = ax.scatter(space[:, 0], space[:, 1], space[:, 2],
+                         c=labels, cmap='viridis', s=50, alpha=0.7)
+
+    # Add a color bar for label interpretation
+    cbar = plt.colorbar(scatter, ax=ax)
+    cbar.set_label("Labels")
+
+    # Customize plot
+    ax.set_title("3D Latent Space Visualization")
+    ax.set_xlabel("Latent Dimension 1")
+    ax.set_ylabel("Latent Dimension 2")
+    ax.set_zlabel("Latent Dimension 3")
+
+    # Show plot
+    plt.show()
