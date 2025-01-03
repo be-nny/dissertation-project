@@ -1,16 +1,13 @@
 # Music Analysis with Machine Learning
-
-## Music Analysis Tool (MAT) - **Preprocessing**
+# **Preprocessing**
 This is responsible for preprocessing a dataset ready for processing. For preprocessing options, run:
 
 ```pycon
-python mat_preprocessor.py --help
+python preprocessor.py --help
 ```
 
-alternatively see below:
-
 ```pycon    
-usage: Music Analysis Tool (MAT) - PREPROCESSOR [-h] -c CONFIG -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...] [-p] [-f FIGURES]
+usage: Music Analysis Tool (MAT) - PREPROCESSOR [-h] -c CONFIG -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...] [-f FIGURES]
 
 Preprocess Audio Dataset
 
@@ -20,7 +17,6 @@ options:
                         config file
   -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...], --signal_processors {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...]
                         the signal processors to apply to the raw audio
-  -p, --process         preprocesses data the data use the parameters set in the config file
   -f FIGURES, --figures FIGURES
                         create a set of n example figures
 ```
@@ -36,8 +32,10 @@ preprocessor_config:
   train_split: float_val_between_0_1
 ```
 
-### Dataset Directory
-The input dataset should be structure in the following way.
+## Dataset Directory
+The input dataset should be structure in the following way. A root directory containing a list of subdirectories named as the genre name with a series of `mp3` or `wav` files in them.
+This project primarily uses the `GTZAN` dataset, which can be downloaded [here](https://www.kaggle.com/datasets/andradaolteanu/gtzan-dataset-music-genre-classification).
+
 ```
 dataset/
 ├─ genre_1/
@@ -47,17 +45,11 @@ dataset/
 ├─ genre_.../
 ├─ genre_n/
 ```
-A root directory containing a list of subdirectories named as the genre name with a series of `mp3` or `wav` files in them.
-This project primarily uses the `GTZAN` dataset, which can be downloaded [here](https://www.kaggle.com/datasets/andradaolteanu/gtzan-dataset-music-genre-classification).
 
-### Spectrographs
+## Spectrographs
 Below demonstrates the possible spectrographs that can be generated in the preprocessing pipeline
-#### CQT example Figure
-![rock_example_figure_CQT_0.png](examples/rock_example_figure_CQT_0.png)
-#### Mel Spectrogram Example Figure
-![rock_example_figure_MEL_SPEC_0.png](examples/rock_example_figure_MEL_SPEC_0.png)
-#### Spectral Centroid Example Figure
-![rock_example_figure_SPEC_CENTROID_0.png](examples/rock_example_figure_SPEC_CENTROID_0.png)
-#### Short-time Fourier Transform Example Figure
-![rock_example_figure_STFT_0.png](examples/rock_example_figure_STFT_0.png)
 
+<img src="examples/rock_example_figure_CQT_0.png" width="400"/> <img src="examples/rock_example_figure_MEL_SPEC_0.png" width="400"/> 
+<img src="examples/rock_example_figure_SPEC_CENTROID_0.png" width="400"/> <img src="examples/rock_example_figure_STFT_0.png" width="400"/>
+
+# **Model**
