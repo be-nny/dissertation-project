@@ -10,6 +10,7 @@ import logging
 
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 from . import signal_processor
@@ -107,20 +108,6 @@ class Preprocessor:
 
         return wave
 
-    def _dec_normalise(self, layer_data: np.array):
-        """
-        Normalise values so that the largest feature is less than 1.
-        :param layer_data: dataset to normalise
-        :return: normalised dataset
-        """
-
-        max_val = np.max(np.abs(layer_data))
-        if max_val == 0:
-            max_val = 1
-        layer_data = layer_data / max_val
-
-        return layer_data
-
     def _rms_normalise_audio(self, wave, rms=0.1):
         """
         Root Mean Squared (RMS) audio normalisation. Balances the perceived loudness to create a cohesive
@@ -174,11 +161,11 @@ class Preprocessor:
                 layers = []
                 for func in self._signal_processors:
                     raw_signal = func(segment, sr)
-                    raw_signal = np.array(raw_signal).flatten()
+                    raw_signal = np.array(raw_signal)
 
-                    # normalise values to be between 1 and -1
-                    raw_signal = self._dec_normalise(raw_signal)
-                    layers.extend(raw_signal)
+                    # scale the signal
+                    scaled_signal = StandardScaler().fit_transform(raw_signal)
+                    layers.extend(scaled_signal.flatten())
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
@@ -228,7 +215,10 @@ class Preprocessor:
                 "segment_duration": self.segment_duration,
                 "target_length": self.target_length,
                 "total_samples": self.total,
-                "signal_processors": [str(sp.__name__) for sp in self._signal_processors]
+                "signal_processors": [str(sp.__name__) for sp in self._signal_processors],
+                "n_fft": signal_processor.N_FFT,
+                "hop_length": signal_processor.HOP_LENGTH,
+                "n_mels": signal_processor.N_MELS,
             }
         }
 

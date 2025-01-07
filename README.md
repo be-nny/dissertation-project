@@ -53,3 +53,4 @@ Below demonstrates the possible spectrographs that can be generated in the prepr
 <img src="examples/rock_example_figure_SPEC_CENTROID_0.png" width="400"/> <img src="examples/rock_example_figure_STFT_0.png" width="400"/>
 
 # **Model**
+

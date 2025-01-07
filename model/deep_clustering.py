@@ -5,80 +5,17 @@ import numpy as np
 import sklearn
 import torch
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.mixture import GaussianMixture
 
 from . import utils
 from matplotlib import pyplot as plt
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
+from .autoencoder import AutoEncoder
 
 matplotlib.use('TkAgg')
-
-class AutoEncoder(nn.Module):
-    def __init__(self, input_size: int, hidden_layers, dropout_rate: float = 0.2):
-        super().__init__()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.encoder = Encoder(input_size, hidden_layers, dropout_rate, activation=nn.ELU())
-        self.decoder = Decoder(self.encoder, activation=nn.ELU())
-        self.hidden_layers = hidden_layers
-
-    def forward(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return encoded, decoded
-
-
-class Encoder(nn.Module):
-    def __init__(self, input_size: int, hidden_layers, dropout_rate: float = 0.2, activation=nn.LeakyReLU()):
-        super().__init__()
-        self.hidden_layers = hidden_layers
-        self.activation = activation
-        self.input_size = input_size
-        self.dropout_rate = dropout_rate
-
-        self.input_layer = torch.nn.Linear(self.input_size, self.hidden_layers[0])
-
-        self.n_layers = 0
-        for i in range(0, len(hidden_layers) - 1):
-            setattr(self, f"dense{i}", torch.nn.Linear(self.hidden_layers[i], hidden_layers[i + 1]))
-            self.n_layers += 1
-
-        self.dropout = nn.Dropout(self.dropout_rate)
-
-    def forward(self, x):
-        x = self.activation(self.input_layer(x))
-
-        for i in range(0, self.n_layers - 1):
-            dense = getattr(self, f"dense{i}")
-            x = self.activation(dense(x))
-            x = self.dropout(x)
-
-        output_layer = getattr(self, f"dense{self.n_layers - 1}")
-        return output_layer(x)
-
-
-class Decoder(nn.Module):
-    def __init__(self, encoder, activation=nn.LeakyReLU()):
-        super().__init__()
-
-        self.encoder = encoder
-        self.hidden_layers = self.encoder.hidden_layers[::-1]
-
-        for i in range(0, self.encoder.n_layers):
-            setattr(self, f"dense{i}", torch.nn.Linear(self.hidden_layers[i], self.hidden_layers[i + 1]))
-
-        self.output_layer = torch.nn.Linear(self.hidden_layers[-1], self.encoder.input_size)
-        self.activation = activation
-        self.dropout = nn.Dropout(self.encoder.dropout_rate)
-
-    def forward(self, x):
-        for i in range(0, self.encoder.n_layers):
-            dense = getattr(self, f"dense{i}")
-            x = dense(x)
-            x = self.activation(x)
-            x = self.dropout(x)
-
-        return self.output_layer(x)
 
 class DEC(nn.Module):
     def __init__(self, autoencoder, latent_space_dims: int, n_clusters: int = 10):
@@ -86,44 +23,46 @@ class DEC(nn.Module):
 
         self.autoencoder = autoencoder
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.alpha = 0.001
 
         # create a clustering layer
-        # this is the learnable parameter
+        # this is the learnable parameter for the cluster centroids
         self.clustering_layer = nn.Parameter(torch.Tensor(n_clusters, latent_space_dims))
         torch.nn.init.xavier_normal_(self.clustering_layer.data)
 
     def forward(self, x):
         latent_space, reconstructed = self.autoencoder(x)
-        q = self._t_distribution(latent_space, self.clustering_layer)
+        q = self._t_distribution(latent_space)
 
         return q, latent_space, reconstructed
 
-    def _t_distribution(self, embedded, centroids):
+    def _t_distribution(self, latent_space):
         """
         Use Student's t-Distribution to create a vector of probabilities of this point being assigned to a particular
         cluster. This vector is then normalised.
 
-        :param embedded: latent_space
-        :param centroids: cluster centroids
+        :param latent_space: latent_space
         :return: soft assignments (num_samples, num_clusters)
         """
 
-        soft_assign = 1/(1+torch.cdist(embedded, centroids).pow(2))
-        soft_assign = soft_assign / soft_assign.sum(dim=1, keepdim=True)
+        q = 1.0 / (1.0 + torch.sum(torch.pow(latent_space.unsqueeze(1) - self.clustering_layer, 2), 2) / self.alpha)
+        q = q.pow((self.alpha + 1.0) / 2.0)
+        q = (q.t() / torch.sum(q, 1)).t()
 
-        return soft_assign
+        return q
 
 class ClusteringModel:
-    def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, hidden_layers, dropout_rate: float = 0.2, n_clusters: int = 10, pre_train_epochs: int = 500):
+    def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, dropout_rate: float = 0.2, n_clusters: int = 10, pre_train_epochs: int = 500):
         self.dataset_loader = dataset_loader
         self.figures_path = self.dataset_loader.get_figures_path()
-        self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=128)
+        self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=512)
         self.input_size = self.dataset_loader.get_input_size()
         self.logger = logger
 
         self.n_clusters = n_clusters
 
         # autoencoder
+        hidden_layers = [round(dataset_loader.get_input_size() / 2), round(dataset_loader.get_input_size() / 2), 1024, 256, 128, 7]
         self.autoencoder = AutoEncoder(self.input_size, hidden_layers, dropout_rate)
         self.ae_lr = 0.001
         self.ae_optimiser = torch.optim.AdamW(self.autoencoder.parameters(), lr=self.ae_lr)
@@ -134,8 +73,8 @@ class ClusteringModel:
 
         # dec
         self.dec = DEC(self.autoencoder, hidden_layers[-1], n_clusters)
-        self.dec_lr = 0.0001
-        self.dec_optimiser = torch.optim.Adam(self.dec.parameters(), lr=self.dec_lr)
+        self.dec_lr = 0.001
+        self.dec_optimiser = torch.optim.AdamW(self.dec.parameters(), lr=self.dec_lr)
         self.dec_scheduler = lr_scheduler.StepLR(self.dec_optimiser, step_size=100, gamma=0.1)
 
     def _pre_train(self, n_epochs: int = 500):
@@ -175,7 +114,31 @@ class ClusteringModel:
 
         # plot pre-training loss
         self._plot_figure(title="Pre-training Loss", path=os.path.join(self.figures_path, "pre-training_loss.pdf"), epochs=[i for i in range(1, len(total_losses) + 1)], loss=total_losses)
+        self._plot_pca()
         return self
+
+    def _plot_pca(self):
+        pca = PCA(n_components=2)
+        latent_space = []
+        labels = []
+        for x, y in self.dataloader:
+            x = x.to(self.autoencoder.device)
+            latent, _ = self.autoencoder(x)
+            latent_space.extend(latent.detach().cpu().numpy())
+            labels.extend(y.cpu().numpy())
+
+        latent_space = np.array(latent_space)
+        labels = np.array(labels)
+        pca_result = pca.fit_transform(latent_space)
+
+        plt.figure(figsize=(8, 8))
+        scatter = plt.scatter(pca_result[:, 0], pca_result[:, 1], c=labels, cmap='viridis', alpha=0.7, s=10)
+        plt.colorbar(scatter, label="Cluster Labels")
+        plt.title("PCA of Latent Space")
+        plt.xlabel("Principal Component 1")
+        plt.ylabel("Principal Component 2")
+        plt.grid(True)
+        plt.show()
 
     def train(self, clustering_epochs: int = 500, update_freq: int = 5):
         self.dec.train()
@@ -189,16 +152,17 @@ class ClusteringModel:
         total_ari = []
 
         # initialise the centroids
-        kmeans = KMeans(n_clusters=self.n_clusters)
         total_data = []
         total_labels = []
         for x, y in self.dataloader:
             total_data.extend(x)
             total_labels.extend(y)
         total_data = torch.tensor(np.array(total_data), dtype=torch.float32).to(self.autoencoder.device)
+
+        gmm = GaussianMixture(n_components=self.n_clusters)
         latent_space, _ = self.autoencoder(total_data)
-        y_pred = kmeans.fit_predict(latent_space.detach().cpu().numpy())
-        cluster_centers = kmeans.cluster_centers_
+        y_pred = gmm.fit_predict(latent_space.detach().cpu().numpy())
+        cluster_centers = gmm.means_
         self.dec.clustering_layer.data = torch.tensor(cluster_centers, dtype=torch.float32).to(self.dec.device)
         y_prev = y_pred
 
@@ -208,7 +172,7 @@ class ClusteringModel:
             losses = []
 
             # updating cluster centers
-            if epoch % update_freq == 0:
+            if epoch % update_freq == 0 and (epoch > 15 or epoch == 0):
                 q, _, _ = self.dec(total_data)
                 p = self._target_distribution(q)
 
@@ -221,8 +185,8 @@ class ClusteringModel:
                 ari = sklearn.metrics.adjusted_rand_score(total_labels, y_pred)
                 y_prev = y_pred
 
-                total_nmi.append(nmi)
-                total_ari.append(ari)
+                total_nmi.append([nmi, epoch])
+                total_ari.append([ari, epoch])
 
             st_ptn = 0
             end_ptn = self.dataloader.batch_size
@@ -233,8 +197,8 @@ class ClusteringModel:
 
                 # work out loss
                 kl_loss = kl_loss_fn(torch.log(q + 1e-10), torch.tensor(p.detach().cpu().numpy()[st_ptn:end_ptn]).to(self.dec.device))
-                reconstruction_loss = recon_loss_fn(reconstructed, x_data)
-                loss = kl_loss * 3 + reconstruction_loss
+                reconstruction_loss_1 = recon_loss_fn(reconstructed, x_data)
+                loss = kl_loss * 2 + reconstruction_loss_1
 
                 loss.backward()
                 losses.append(loss.item())
@@ -260,8 +224,8 @@ class ClusteringModel:
 
         # plot training loss
         self._plot_figure(title="Training Loss", path=os.path.join(self.figures_path, "training_loss.pdf"), epochs=[i for i in range(1, len(total_losses) + 1)], loss=total_losses)
-        self._plot_figure(title="Normalised Mutual Information Scores", path=os.path.join(self.figures_path, "nmi_scores.pdf"), epochs=[i for i in range(1, len(total_nmi) + 1, update_freq)], nmi=total_nmi)
-        self._plot_figure(title="Adjusted Rand Index Scores", path=os.path.join(self.figures_path, "ari_scores.pdf"), epochs=[i for i in range(1, len(total_ari) + 1, update_freq)], nmi=total_ari)
+        self._plot_figure(title="Normalised Mutual Information Scores", path=os.path.join(self.figures_path, "nmi_scores.pdf"), epochs=[val[1] for val in total_nmi], nmi=[val[0] for val in total_nmi])
+        self._plot_figure(title="Adjusted Rand Index Scores", path=os.path.join(self.figures_path, "ari_scores.pdf"), epochs=[val[1] for val in total_ari], nmi=[val[0] for val in total_ari])
 
         return self
 

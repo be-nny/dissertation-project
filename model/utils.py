@@ -87,7 +87,7 @@ class Loader:
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
 
         dataset = TensorDataset(data_tensor, labels_tensor)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=batch_size)
 
         self.input_size = np.array(data[0]).shape[0]
 

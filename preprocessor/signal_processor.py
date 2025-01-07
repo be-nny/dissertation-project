@@ -10,6 +10,9 @@ plt.figure()
 plt.close()
 
 FIGURE_SIZE = (10, 10)
+N_FFT = 1024
+HOP_LENGTH = 4096
+N_MELS = 128
 
 class SignalLoader:
     def __init__(self, wave: np.ndarray, sr: float, segment_duration=10):
@@ -64,7 +67,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     if len(wave) < nperseg:
         return
 
-    f, t, transform = signal.stft(wave, fs=sr, nperseg=nperseg)
+    f, t, transform = signal.stft(wave, fs=sr, nperseg=nperseg, nfft=N_FFT)
 
     if not debug:
         # transform contains complex values, the complex components contain phase
@@ -93,11 +96,10 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
     """
 
     # if the length of the wav is smaller than the window function, stop
-    n_fft = 2048
-    if len(wave) < n_fft:
+    if len(wave) < N_FFT:
         return
 
-    mel_spectrogram = librosa.feature.melspectrogram(y=wave, sr=sr, n_fft=n_fft, hop_length=512, n_mels=128)
+    mel_spectrogram = librosa.feature.melspectrogram(y=wave, sr=sr, n_fft=N_FFT, hop_length=HOP_LENGTH, n_mels=N_MELS)
 
     # this converts the power values to a logarithmic scale since humans perceive loudness this way
     mel_spectrogram_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
@@ -107,7 +109,7 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
     else:
         # Plot the Mel spectrogram
         plt.figure(figsize=FIGURE_SIZE)
-        librosa.display.specshow(mel_spectrogram_db, sr=sr, hop_length=512, x_axis='time', y_axis='mel')
+        librosa.display.specshow(mel_spectrogram_db, sr=sr, hop_length=HOP_LENGTH, x_axis='time', y_axis='mel')
         plt.title(f"Example MEL_SPEC Graph")
         plt.colorbar(format="%+2.0f dB")
         plt.savefig(path, bbox_inches="tight", pad_inches=0)
@@ -128,7 +130,7 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
     :return: cqt as an image array
     """
 
-    cqt_transform = np.abs(librosa.cqt(wav, sr=sr))
+    cqt_transform = np.abs(librosa.cqt(wav, sr=sr, hop_length=HOP_LENGTH))
 
     # converted to a logarithmic scale
     cqt_transform_db = librosa.amplitude_to_db(cqt_transform, ref=np.max)
@@ -157,7 +159,7 @@ def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
     """
 
     S, _ = librosa.magphase(librosa.stft(y=wav))
-    spectral_centroid = librosa.feature.spectral_centroid(S=S, sr=sr)
+    spectral_centroid = librosa.feature.spectral_centroid(S=S, sr=sr, hop_length=HOP_LENGTH)
 
     if not debug:
         return spectral_centroid
