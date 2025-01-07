@@ -5,7 +5,6 @@ from torch import nn
 class AutoEncoder(nn.Module):
     def __init__(self, input_size: int, hidden_layers, dropout_rate: float = 0.2):
         super().__init__()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.encoder = Encoder(input_size, hidden_layers, dropout_rate)
         self.decoder = Decoder(self.encoder)
         self.hidden_layers = hidden_layers

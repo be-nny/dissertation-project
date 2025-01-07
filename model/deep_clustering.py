@@ -22,7 +22,6 @@ class DEC(nn.Module):
         super().__init__()
 
         self.autoencoder = autoencoder
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.alpha = 0.001
 
         # create a clustering layer
@@ -58,12 +57,17 @@ class ClusteringModel:
         self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=512)
         self.input_size = self.dataset_loader.get_input_size()
         self.logger = logger
-
         self.n_clusters = n_clusters
 
+        if torch.cuda.is_available():
+            self.logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
+        else:
+            self.logger.info("No GPU available. Training will run on CPU.")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         # autoencoder
-        hidden_layers = [round(dataset_loader.get_input_size() / 2), round(dataset_loader.get_input_size() / 2), 1024, 256, 128, 7]
-        self.autoencoder = AutoEncoder(self.input_size, hidden_layers, dropout_rate)
+        hidden_layers = [round(dataset_loader.get_input_size() / 2), 1024, 512, 512, 10]
+        self.autoencoder = AutoEncoder(self.input_size, hidden_layers, dropout_rate).to(self.device)
         self.ae_lr = 0.001
         self.ae_optimiser = torch.optim.AdamW(self.autoencoder.parameters(), lr=self.ae_lr)
         self.ae_scheduler = lr_scheduler.StepLR(self.ae_optimiser, step_size=100, gamma=0.1)
@@ -89,7 +93,7 @@ class ClusteringModel:
             losses = []
             for x_data, y_labels in self.dataloader:
                 self.ae_optimiser.zero_grad()
-                x_data = x_data.to(self.autoencoder.device)
+                x_data = x_data.to(self.device)
                 embeddings, reconstructed = self.autoencoder(x_data)
 
                 reconstruction_loss = recon_loss_fn(reconstructed, x_data)
@@ -122,7 +126,7 @@ class ClusteringModel:
         latent_space = []
         labels = []
         for x, y in self.dataloader:
-            x = x.to(self.autoencoder.device)
+            x = x.to(self.device)
             latent, _ = self.autoencoder(x)
             latent_space.extend(latent.detach().cpu().numpy())
             labels.extend(y.cpu().numpy())
@@ -157,13 +161,13 @@ class ClusteringModel:
         for x, y in self.dataloader:
             total_data.extend(x)
             total_labels.extend(y)
-        total_data = torch.tensor(np.array(total_data), dtype=torch.float32).to(self.autoencoder.device)
+        total_data = torch.tensor(np.array(total_data), dtype=torch.float32).to(self.device)
 
         gmm = GaussianMixture(n_components=self.n_clusters)
         latent_space, _ = self.autoencoder(total_data)
         y_pred = gmm.fit_predict(latent_space.detach().cpu().numpy())
         cluster_centers = gmm.means_
-        self.dec.clustering_layer.data = torch.tensor(cluster_centers, dtype=torch.float32).to(self.dec.device)
+        self.dec.clustering_layer.data = torch.tensor(cluster_centers, dtype=torch.float32).to(self.device)
         y_prev = y_pred
 
         best_loss = np.inf
@@ -192,11 +196,11 @@ class ClusteringModel:
             end_ptn = self.dataloader.batch_size
             for x_data, y_true in self.dataloader:
                 self.dec_optimiser.zero_grad()
-                x_data = x_data.to(self.dec.device)
+                x_data = x_data.to(self.device)
                 q, latent_space, reconstructed = self.dec(x_data)
 
                 # work out loss
-                kl_loss = kl_loss_fn(torch.log(q + 1e-10), torch.tensor(p.detach().cpu().numpy()[st_ptn:end_ptn]).to(self.dec.device))
+                kl_loss = kl_loss_fn(torch.log(q + 1e-10), torch.tensor(p.detach().cpu().numpy()[st_ptn:end_ptn]).to(self.device))
                 reconstruction_loss_1 = recon_loss_fn(reconstructed, x_data)
                 loss = kl_loss * 2 + reconstruction_loss_1
 
