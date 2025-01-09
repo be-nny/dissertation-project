@@ -9,7 +9,7 @@ parser.add_argument("-c", "--config", required=True, help="config file")
 parser.add_argument("-u", "--uuid", required=True, help="UUID of the preprocessed dataset to use")
 
 if __name__ == "__main__":
-    args = parser.parse_args()
+    args = parser.parse_args(["--config=config.yml", "--uuid=c618e1"])
 
     config = config.Config(path=args.config)
     logger = logger.get_logger()
@@ -17,5 +17,5 @@ if __name__ == "__main__":
     dataset_loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger)
 
     # deep embedded clustering model
-    clustering_model = deep_clustering.ClusteringModel(dataset_loader, logger=logger, pre_train_epochs=200, dropout_rate=0.1)
-    clustering_model.train(clustering_epochs=500, update_freq=5)
+    clustering_model = deep_clustering.ClusteringModel(dataset_loader, logger=logger, pre_train_epochs=200, dropout_rate=0.2)
+    # clustering_model.train(clustering_epochs=500, update_freq=5)

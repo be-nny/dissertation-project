@@ -8,21 +8,17 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
 
-from matplotlib import pyplot as plt
-
-matplotlib.use('TkAgg')
-
 class ReceiptReader:
     def __init__(self, filename):
         self.filename = filename
         self.genres = []
-        self.signal_processors = []
+        self.signal_processor = []
 
     def __enter__(self):
         with open(self.filename, 'r') as f:
             data = json.load(f)
             self.genres = data['genres']
-            self.signal_processors = data['preprocessor_info']['signal_processors']
+            self.signal_processor = data['preprocessor_info']['signal_processor']
 
         return self
 
@@ -34,7 +30,7 @@ class Loader:
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
         self.logger = logger
-        self.input_size = None
+        self.input_shape = None
 
         # creating the test/train arrays
         self.test_split = self._make_splits(split_type="test")
@@ -45,9 +41,9 @@ class Loader:
 
         with ReceiptReader(filename=os.path.join(self.root, 'receipt.json')) as receipt:
             self.genres = receipt.genres
-            self.signal_processors = receipt.signal_processors
+            self.signal_processor = receipt.signal_processor
 
-        self.logger.info(f"'{self.uuid}' applied with {', '.join(self.signal_processors)}")
+        self.logger.info(f"'{self.uuid}' applied with {self.signal_processor}")
 
     def _make_splits(self, split_type: str) -> list:
         split = []
@@ -63,8 +59,8 @@ class Loader:
         np.random.shuffle(split)
         return split
 
-    def get_input_size(self):
-        return self.input_size
+    def get_input_shape(self):
+        return self.input_shape
 
     def get_data(self):
         data, genre_labels = self.get_data_split(split_type='train')
@@ -89,7 +85,7 @@ class Loader:
         dataset = TensorDataset(data_tensor, labels_tensor)
         dataloader = DataLoader(dataset, batch_size=batch_size)
 
-        self.input_size = np.array(data[0]).shape[0]
+        self.input_shape = np.array(data[0]).shape
 
         return dataloader
 
@@ -109,24 +105,25 @@ class Loader:
         else:
             raise ValueError("split_type must be either 'train' or 'test'")
 
-        layer_data = []
+        signal_data = []
         genre_labels = []
 
         for i in tqdm(range(0, len(split)), unit="file", desc=f"Loading {split_type} data from '{self.uuid}'"):
             with (h5py.File(split[i], "r") as hdf_file):
-                layers = np.array(hdf_file["layers"]).flatten()
+                layers = np.array(hdf_file["signal"])
                 b_genre = hdf_file["genre"][()]
                 genre = b_genre.decode("utf-8")
 
                 # removing any nan values
                 layers = np.nan_to_num(layers, nan=0.0, posinf=1e9, neginf=-1e9)
 
-                layer_data.append(layers)
+                signal_data.append(layers)
                 genre_labels.append(genre)
 
                 hdf_file.close()
 
-        return layer_data, genre_labels
+        signal_data = np.array(signal_data)
+        return signal_data, genre_labels
 
     def get_genres(self):
         return self.genres
@@ -136,24 +133,3 @@ class Loader:
 
     def get_figures_path(self):
         return os.path.join(self.root, 'figures')
-
-def plot_3d(space, labels):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Scatter plot with labels as colors
-    scatter = ax.scatter(space[:, 0], space[:, 1], space[:, 2],
-                         c=labels, cmap='viridis', s=50, alpha=0.7)
-
-    # Add a color bar for label interpretation
-    cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label("Labels")
-
-    # Customize plot
-    ax.set_title("3D Latent Space Visualization")
-    ax.set_xlabel("Latent Dimension 1")
-    ax.set_ylabel("Latent Dimension 2")
-    ax.set_zlabel("Latent Dimension 3")
-
-    # Show plot
-    plt.show()

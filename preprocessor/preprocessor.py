@@ -55,15 +55,14 @@ class Preprocessor:
         self.figures_path = os.path.join(self.uuid_path, "figures")
         os.mkdir(self.figures_path)
 
-        self._signal_processors = None
+        self.signal_processor = None
         self.segment_duration = segment_duration
         self.target_length = target_length
 
         self.reader = utils.DatasetReader(self.dataset_dir, self.logger, train_split=train_split)
         self.total = 0
-        self.input_layer_dims = None
 
-    def set_signal_processors(self, *signal_processors) -> Preprocessor:
+    def set_signal_processor(self, signal_processor) -> Preprocessor:
         """
         Set the type of audio spectra that are created for each song
 
@@ -71,7 +70,7 @@ class Preprocessor:
         :return: current instance
         """
 
-        self._signal_processors = signal_processors
+        self.signal_processor = signal_processor
         return self
 
     def _create_hdf(self, path: str, **kwargs):
@@ -158,22 +157,14 @@ class Preprocessor:
                     break
 
                 # generate the different audio spectra data and merge it into an array
-                layers = []
-                for func in self._signal_processors:
-                    raw_signal = func(segment, sr)
-                    raw_signal = np.array(raw_signal)
-
-                    # scale the signal
-                    scaled_signal = StandardScaler().fit_transform(raw_signal)
-                    layers.extend(scaled_signal.flatten())
+                raw_signal = self.signal_processor(segment, sr)
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
-                self._create_hdf(path=file_name, layers=layers, genre=genre)
-                self.input_layer_dims = np.array(layers).shape
+                self._create_hdf(path=file_name, signal=raw_signal, genre=genre)
 
                 # properly discard the layers arr
-                del layers
+                del raw_signal
                 self.total += 1
                 count += 1
 
@@ -215,7 +206,7 @@ class Preprocessor:
                 "segment_duration": self.segment_duration,
                 "target_length": self.target_length,
                 "total_samples": self.total,
-                "signal_processors": [str(sp.__name__) for sp in self._signal_processors],
+                "signal_processor": str(self.signal_processor.__name__),
                 "n_fft": signal_processor.N_FFT,
                 "hop_length": signal_processor.HOP_LENGTH,
                 "n_mels": signal_processor.N_MELS,
@@ -241,12 +232,12 @@ class Preprocessor:
 
         return self.reader.files
 
-    def get_signal_processors(self) -> list:
+    def get_signal_processor(self) -> list:
         """
         :return: A list of signal processors
         """
 
-        return self._signal_processors
+        return self.signal_processor
 
     def get_figures_path(self) -> str:
         """

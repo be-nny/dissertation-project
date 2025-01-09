@@ -1,68 +1,60 @@
 import torch
 from torch import nn
 
-
-class AutoEncoder(nn.Module):
-    def __init__(self, input_size: int, hidden_layers, dropout_rate: float = 0.2):
+class LSTMAutoencoder(nn.Module):
+    def __init__(self, input_dim, hidden_dim, latent_dim, num_layers=3):
         super().__init__()
-        self.encoder = Encoder(input_size, hidden_layers, dropout_rate)
-        self.decoder = Decoder(self.encoder)
-        self.hidden_layers = hidden_layers
+
+        # encode
+        self.encoder = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.hidden_to_latent = nn.Linear(hidden_dim, latent_dim)
+
+        # latent space
+        self.latent_to_hidden = nn.Linear(latent_dim, input_dim)
+        self.latent_to_input = nn.Linear(latent_dim, input_dim)
+
+        # decoder
+        self.decoder = nn.LSTM(input_dim, input_dim, num_layers, batch_first=True)
+
+    def forward(self, x):
+        # encode
+        _, (hidden_state, _) = self.encoder(x)
+        hidden_state = hidden_state[-1]
+        latent = self.hidden_to_latent(hidden_state)
+
+        # decode
+        hidden = self.latent_to_hidden(latent).unsqueeze(0)
+        hidden = hidden.repeat(self.decoder.num_layers, 1, 1)
+        c_0 = torch.zeros_like(hidden)
+
+        latent_seq = self.latent_to_input(latent).unsqueeze(1).repeat(1, x.size(1), 1)
+        reconstructed, _ = self.decoder(latent_seq, (hidden, c_0))
+
+        return latent, reconstructed
+
+
+class AE(nn.Module):
+    def __init__(self, hidden_layers, dropout_rate: float = 0.2):
+        super().__init__()
+
+        # encoder layers
+        encoder_layers = []
+        for i in range(0, len(hidden_layers) - 1):
+            encoder_layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
+            encoder_layers.append(nn.LeakyReLU())
+            encoder_layers.append(nn.Dropout(dropout_rate))
+
+        # decoder layers
+        decoder_layers = []
+        hidden_layers = hidden_layers[::-1]
+        for i in range(0, len(hidden_layers) - 1):
+            decoder_layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
+            decoder_layers.append(nn.LeakyReLU())
+
+        self.encoder = nn.Sequential(*encoder_layers)
+        self.decoder = nn.Sequential(*decoder_layers)
 
     def forward(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return encoded, decoded
-
-
-class Encoder(nn.Module):
-    def __init__(self, input_size: int, hidden_layers, dropout_rate: float = 0.2, activation=nn.LeakyReLU()):
-        super().__init__()
-        self.hidden_layers = hidden_layers
-        self.activation = activation
-        self.input_size = input_size
-        self.dropout_rate = dropout_rate
-
-        self.input_layer = torch.nn.Linear(self.input_size, self.hidden_layers[0])
-
-        self.n_layers = 0
-        for i in range(0, len(hidden_layers) - 1):
-            setattr(self, f"dense{i}", torch.nn.Linear(self.hidden_layers[i], hidden_layers[i + 1]))
-            self.n_layers += 1
-
-        self.dropout = nn.Dropout(self.dropout_rate)
-
-    def forward(self, x):
-        x = self.activation(self.input_layer(x))
-
-        for i in range(0, self.n_layers - 1):
-            dense = getattr(self, f"dense{i}")
-            x = self.activation(dense(x))
-            x = self.dropout(x)
-
-        output_layer = getattr(self, f"dense{self.n_layers - 1}")
-        return output_layer(x)
-
-
-class Decoder(nn.Module):
-    def __init__(self, encoder, activation=nn.LeakyReLU()):
-        super().__init__()
-
-        self.encoder = encoder
-        self.hidden_layers = self.encoder.hidden_layers[::-1]
-
-        for i in range(0, self.encoder.n_layers):
-            setattr(self, f"dense{i}", torch.nn.Linear(self.hidden_layers[i], self.hidden_layers[i + 1]))
-
-        self.output_layer = torch.nn.Linear(self.hidden_layers[-1], self.encoder.input_size)
-        self.activation = activation
-        self.dropout = nn.Dropout(self.encoder.dropout_rate)
-
-    def forward(self, x):
-        for i in range(0, self.encoder.n_layers):
-            dense = getattr(self, f"dense{i}")
-            x = dense(x)
-            x = self.activation(x)
-            x = self.dropout(x)
-
-        return self.output_layer(x)

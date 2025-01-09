@@ -7,7 +7,7 @@ from audioread import NoBackendError
 from tqdm import tqdm
 from audio_metadata import UnsupportedFormat
 
-def create_graph_example_figures(*signal_processors, song_paths, figures_path, num_songs=3) -> None:
+def create_graph_example_figures(signal_processor, song_paths, figures_path, num_songs=3) -> None:
     """
     Creates a set of example figures for a given song. This uses the entire duration of the song
 
@@ -21,8 +21,7 @@ def create_graph_example_figures(*signal_processors, song_paths, figures_path, n
         path, genre = random.choice(song_paths)
 
         wave, sr = librosa.load(path, sr=None)
-        for func in signal_processors:
-            func(wave, sr, path=f"{figures_path}/{genre}_example_figure_{func.__name__}_{i}.pdf", debug=True)
+        signal_processor(wave, sr, path=f"{figures_path}/{genre}_example_figure_{signal_processor.__name__}_{i}.pdf", debug=True)
 
 def get_song_metadata(path: str) -> str:
     """

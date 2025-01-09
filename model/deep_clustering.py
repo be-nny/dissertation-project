@@ -13,7 +13,8 @@ from matplotlib import pyplot as plt
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
-from .autoencoder import AutoEncoder
+from . import autoencoder
+from mpl_toolkits.mplot3d import Axes3D
 
 matplotlib.use('TkAgg')
 
@@ -55,7 +56,6 @@ class ClusteringModel:
         self.dataset_loader = dataset_loader
         self.figures_path = self.dataset_loader.get_figures_path()
         self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=512)
-        self.input_size = self.dataset_loader.get_input_size()
         self.logger = logger
         self.n_clusters = n_clusters
 
@@ -65,24 +65,22 @@ class ClusteringModel:
             self.logger.info("No GPU available. Training will run on CPU.")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # autoencoder
-        hidden_layers = [round(dataset_loader.get_input_size() / 2), 1024, 512, 512, 10]
-        self.autoencoder = AutoEncoder(self.input_size, hidden_layers, dropout_rate).to(self.device)
-        self.ae_lr = 0.001
-        self.ae_optimiser = torch.optim.AdamW(self.autoencoder.parameters(), lr=self.ae_lr)
-        self.ae_scheduler = lr_scheduler.StepLR(self.ae_optimiser, step_size=100, gamma=0.1)
-
-        # pretrain the autoencoder
+        # lstm autoencoder
+        input_shape = self.dataset_loader.get_input_shape()
+        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=128, latent_dim=15, num_layers=3)
+        self.lstm_lr = 0.0001
+        self.lstm_optimiser = torch.optim.AdamW(self.lstm_ae.parameters(), self.lstm_lr)
+        self.lstm_scheduler = lr_scheduler.StepLR(self.lstm_optimiser, step_size=100, gamma=0.1)
         self._pre_train(n_epochs=pre_train_epochs)
 
-        # dec
-        self.dec = DEC(self.autoencoder, hidden_layers[-1], n_clusters)
-        self.dec_lr = 0.001
-        self.dec_optimiser = torch.optim.AdamW(self.dec.parameters(), lr=self.dec_lr)
-        self.dec_scheduler = lr_scheduler.StepLR(self.dec_optimiser, step_size=100, gamma=0.1)
+        # # dec
+        # self.dec = DEC(self.autoencoder, hidden_layers[-1], n_clusters)
+        # self.dec_lr = 0.001
+        # self.dec_optimiser = torch.optim.AdamW(self.dec.parameters(), lr=self.dec_lr)
+        # self.dec_scheduler = lr_scheduler.StepLR(self.dec_optimiser, step_size=100, gamma=0.1)
 
     def _pre_train(self, n_epochs: int = 500):
-        self.autoencoder.train()
+        self.lstm_ae.train()
 
         recon_loss_fn = nn.MSELoss()
         total_losses = []
@@ -92,18 +90,15 @@ class ClusteringModel:
         for _ in tqdm_loop:
             losses = []
             for x_data, y_labels in self.dataloader:
-                self.ae_optimiser.zero_grad()
+                self.lstm_ae.zero_grad()
                 x_data = x_data.to(self.device)
-                embeddings, reconstructed = self.autoencoder(x_data)
+                _, reconstructed = self.lstm_ae(x_data)
 
                 reconstruction_loss = recon_loss_fn(reconstructed, x_data)
                 losses.append(reconstruction_loss.item())
                 reconstruction_loss.backward()
 
-                # prevent gradient explosion
-                torch.nn.utils.clip_grad_norm_(self.autoencoder.parameters(), max_norm=1.0)
-
-                self.ae_optimiser.step()
+                self.lstm_optimiser.step()
 
             mean_loss = np.mean(losses)
             if mean_loss < best_loss:
@@ -112,19 +107,18 @@ class ClusteringModel:
             tqdm_loop.set_description(f"Pre-training Autoencoder - Loss={mean_loss}")
             total_losses.append(mean_loss)
 
-            self.ae_scheduler.step()
+            self.lstm_scheduler.step()
 
         self.logger.info(f"Pre-training Autoencoder complete! Best Loss={best_loss}")
 
         # plot pre-training loss
         self._plot_figure(title="Pre-training Loss", path=os.path.join(self.figures_path, "pre-training_loss.pdf"), epochs=[i for i in range(1, len(total_losses) + 1)], loss=total_losses)
-        self._plot_pca()
         return self
 
     def _plot_pca(self):
-        pca = PCA(n_components=2)
         latent_space = []
         labels = []
+
         for x, y in self.dataloader:
             x = x.to(self.device)
             latent, _ = self.autoencoder(x)
@@ -133,15 +127,19 @@ class ClusteringModel:
 
         latent_space = np.array(latent_space)
         labels = np.array(labels)
-        pca_result = pca.fit_transform(latent_space)
 
-        plt.figure(figsize=(8, 8))
-        scatter = plt.scatter(pca_result[:, 0], pca_result[:, 1], c=labels, cmap='viridis', alpha=0.7, s=10)
-        plt.colorbar(scatter, label="Cluster Labels")
-        plt.title("PCA of Latent Space")
-        plt.xlabel("Principal Component 1")
-        plt.ylabel("Principal Component 2")
-        plt.grid(True)
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        scatter = ax.scatter(
+            latent_space[:, 0], latent_space[:, 1], latent_space[:, 2],
+            c=labels, cmap='viridis', alpha=0.7, s=10
+        )
+
+        cbar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
+        ax.set_title("3D Plot of Latent Space")
+        ax.set_xlabel("Axis 1")
+        ax.set_ylabel("Axis 2")
+        ax.set_zlabel("Axis 3")
         plt.show()
 
     def train(self, clustering_epochs: int = 500, update_freq: int = 5):
@@ -163,10 +161,10 @@ class ClusteringModel:
             total_labels.extend(y)
         total_data = torch.tensor(np.array(total_data), dtype=torch.float32).to(self.device)
 
-        gmm = GaussianMixture(n_components=self.n_clusters)
+        kmeans = KMeans(n_clusters=self.n_clusters)
         latent_space, _ = self.autoencoder(total_data)
-        y_pred = gmm.fit_predict(latent_space.detach().cpu().numpy())
-        cluster_centers = gmm.means_
+        y_pred = kmeans.fit_predict(latent_space.detach().cpu().numpy())
+        cluster_centers = kmeans.cluster_centers_
         self.dec.clustering_layer.data = torch.tensor(cluster_centers, dtype=torch.float32).to(self.device)
         y_prev = y_pred
 
