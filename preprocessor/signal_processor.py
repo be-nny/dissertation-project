@@ -1,3 +1,9 @@
+"""
+This file is responsible for generating a selection of audio spectra for a given audio source. Each spectrogram is
+defined in its own method and also generates an example spectrogram when 'debug' is set to True. The example figures
+are saved to the 'figures' directory that is created when a new preprocessed dataset is created.
+"""
+
 import librosa
 import matplotlib
 import numpy as np
@@ -10,7 +16,6 @@ plt.figure()
 plt.close()
 
 FIGURE_SIZE = (10, 10)
-
 N_FFT = 2048
 NPERSEG = 256
 HOP_LENGTH = 512
