@@ -176,6 +176,16 @@ def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
         return None
 
 def MFCC(wav: np.ndarray, sr: float, path=None, debug=False):
+    """
+    Generate a MFCC of the audio file.
+
+    :param wav: raw audio data
+    :param sr: sample rate
+    :param path: output path, default to None
+    :param debug: debug mode, default to False
+    :return: spectral centroid as an image array
+    """
+
     mfcc = librosa.feature.mfcc(y=wav, sr=sr, hop_length=HOP_LENGTH, n_mels=N_MELS, n_fft=N_FFT)
     mfcc_db = librosa.power_to_db(mfcc, ref=np.max)
 
