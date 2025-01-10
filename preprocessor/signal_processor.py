@@ -10,8 +10,9 @@ plt.figure()
 plt.close()
 
 FIGURE_SIZE = (10, 10)
-N_FFT = 1024
-HOP_LENGTH = 4096
+N_FFT = 8192
+NPERSEG = 512
+HOP_LENGTH = 1024
 N_MELS = 128
 
 class SignalLoader:
@@ -21,7 +22,6 @@ class SignalLoader:
 
         :param wave: raw audio data
         :param sr: sample rate
-        :param name: name of the audio file
         :param segment_duration: length of each song snippet
         """
 
@@ -63,11 +63,10 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
     """
 
     # if the length of the wav is smaller than the window function, stop
-    nperseg = 8192
-    if len(wave) < nperseg:
+    if len(wave) < NPERSEG:
         return
 
-    f, t, transform = signal.stft(wave, fs=sr, nperseg=nperseg, nfft=N_FFT)
+    f, t, transform = signal.stft(wave, fs=sr, nperseg=NPERSEG, nfft=N_FFT)
 
     if not debug:
         # transform contains complex values, the complex components contain phase

@@ -19,10 +19,10 @@ from mpl_toolkits.mplot3d import Axes3D
 matplotlib.use('TkAgg')
 
 class DEC(nn.Module):
-    def __init__(self, autoencoder, latent_space_dims: int, n_clusters: int = 10):
+    def __init__(self, lstm_ae, latent_space_dims: int, n_clusters: int = 10):
         super().__init__()
 
-        self.autoencoder = autoencoder
+        self.lstm_ae = lstm_ae
         self.alpha = 0.001
 
         # create a clustering layer
@@ -31,7 +31,7 @@ class DEC(nn.Module):
         torch.nn.init.xavier_normal_(self.clustering_layer.data)
 
     def forward(self, x):
-        latent_space, reconstructed = self.autoencoder(x)
+        latent_space, reconstructed = self.lstm_ae(x)
         q = self._t_distribution(latent_space)
 
         return q, latent_space, reconstructed
@@ -52,7 +52,7 @@ class DEC(nn.Module):
         return q
 
 class ClusteringModel:
-    def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, dropout_rate: float = 0.2, n_clusters: int = 10, pre_train_epochs: int = 500):
+    def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, n_clusters: int = 10, pre_train_epochs: int = 500):
         self.dataset_loader = dataset_loader
         self.figures_path = self.dataset_loader.get_figures_path()
         self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=512)
@@ -67,17 +67,17 @@ class ClusteringModel:
 
         # lstm autoencoder
         input_shape = self.dataset_loader.get_input_shape()
-        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=128, latent_dim=15, num_layers=3)
-        self.lstm_lr = 0.0001
-        self.lstm_optimiser = torch.optim.AdamW(self.lstm_ae.parameters(), self.lstm_lr)
-        self.lstm_scheduler = lr_scheduler.StepLR(self.lstm_optimiser, step_size=100, gamma=0.1)
+        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=128, latent_dim=8, num_layers=4).to(self.device)
+        self.lstm_lr = 1e-4
+        self.lstm_optimiser = torch.optim.AdamW(self.lstm_ae.parameters(), self.lstm_lr, weight_decay=1e-2)
+        self.lstm_scheduler = lr_scheduler.StepLR(self.lstm_optimiser, step_size=50, gamma=0.5)
         self._pre_train(n_epochs=pre_train_epochs)
 
-        # # dec
-        # self.dec = DEC(self.autoencoder, hidden_layers[-1], n_clusters)
-        # self.dec_lr = 0.001
-        # self.dec_optimiser = torch.optim.AdamW(self.dec.parameters(), lr=self.dec_lr)
-        # self.dec_scheduler = lr_scheduler.StepLR(self.dec_optimiser, step_size=100, gamma=0.1)
+        # dec
+        self.dec = DEC(self.lstm_ae, 10, n_clusters)
+        self.dec_lr = 1e-3
+        self.dec_optimiser = torch.optim.AdamW(self.dec.parameters(), lr=self.dec_lr)
+        self.dec_scheduler = lr_scheduler.StepLR(self.dec_optimiser, step_size=100, gamma=0.1)
 
     def _pre_train(self, n_epochs: int = 500):
         self.lstm_ae.train()
@@ -92,7 +92,7 @@ class ClusteringModel:
             for x_data, y_labels in self.dataloader:
                 self.lstm_ae.zero_grad()
                 x_data = x_data.to(self.device)
-                _, reconstructed = self.lstm_ae(x_data)
+                latent, reconstructed = self.lstm_ae(x_data)
 
                 reconstruction_loss = recon_loss_fn(reconstructed, x_data)
                 losses.append(reconstruction_loss.item())
@@ -113,15 +113,16 @@ class ClusteringModel:
 
         # plot pre-training loss
         self._plot_figure(title="Pre-training Loss", path=os.path.join(self.figures_path, "pre-training_loss.pdf"), epochs=[i for i in range(1, len(total_losses) + 1)], loss=total_losses)
+        self._plot_latent_space()
         return self
 
-    def _plot_pca(self):
+    def _plot_latent_space(self):
         latent_space = []
         labels = []
 
         for x, y in self.dataloader:
             x = x.to(self.device)
-            latent, _ = self.autoencoder(x)
+            latent, _ = self.lstm_ae(x)
             latent_space.extend(latent.detach().cpu().numpy())
             labels.extend(y.cpu().numpy())
 
@@ -162,7 +163,7 @@ class ClusteringModel:
         total_data = torch.tensor(np.array(total_data), dtype=torch.float32).to(self.device)
 
         kmeans = KMeans(n_clusters=self.n_clusters)
-        latent_space, _ = self.autoencoder(total_data)
+        latent_space, _ = self.lstm_ae(total_data)
         y_pred = kmeans.fit_predict(latent_space.detach().cpu().numpy())
         cluster_centers = kmeans.cluster_centers_
         self.dec.clustering_layer.data = torch.tensor(cluster_centers, dtype=torch.float32).to(self.device)
