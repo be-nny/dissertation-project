@@ -10,7 +10,7 @@ import logging
 
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
-from sklearn.preprocessing import StandardScaler, QuantileTransformer, Normalizer
+from sklearn.preprocessing import StandardScaler, QuantileTransformer, Normalizer, MinMaxScaler
 from tqdm import tqdm
 
 from . import signal_processor
@@ -156,14 +156,15 @@ class Preprocessor:
                 if len(segment) == 0:
                     break
 
-                # generate the different audio spectra data and merge it into an array
+                # generate the desired audio spectrogram
                 raw_signal = self.signal_processor(segment, sr)
-                scalar = Normalizer()
-                scaled_signal = scalar.fit_transform(raw_signal)
+
+                # scalar = MinMaxScaler(feature_range=(-3, 3))
+                # raw_signal = scalar.fit_transform(raw_signal)
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
-                self._create_hdf(path=file_name, signal=scaled_signal, genre=genre)
+                self._create_hdf(path=file_name, signal=raw_signal, genre=genre)
 
                 # properly discard the layers arr
                 del raw_signal

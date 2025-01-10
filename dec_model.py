@@ -17,5 +17,5 @@ if __name__ == "__main__":
     dataset_loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger)
 
     # deep embedded clustering model
-    clustering_model = deep_clustering.ClusteringModel(dataset_loader, logger=logger, pre_train_epochs=250)
-    # clustering_model.train(clustering_epochs=500, update_freq=5)
+    clustering_model = deep_clustering.ClusteringModel(dataset_loader, logger=logger, pre_train_epochs=100)
+    # clustering_model.train(clustering_epochs=500, update_freq=1)

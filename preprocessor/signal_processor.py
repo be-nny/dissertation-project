@@ -10,9 +10,10 @@ plt.figure()
 plt.close()
 
 FIGURE_SIZE = (10, 10)
-N_FFT = 8192
-NPERSEG = 512
-HOP_LENGTH = 1024
+
+N_FFT = 2048
+NPERSEG = 256
+HOP_LENGTH = 512
 N_MELS = 128
 
 class SignalLoader:
@@ -174,6 +175,21 @@ def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
         plt.close()
         return None
 
+def MFCC(wav: np.ndarray, sr: float, path=None, debug=False):
+    mfcc = librosa.feature.mfcc(y=wav, sr=sr, hop_length=HOP_LENGTH, n_mels=N_MELS, n_fft=N_FFT)
+    mfcc_db = librosa.power_to_db(mfcc, ref=np.max)
+
+    if not debug:
+        return mfcc_db
+    else:
+        plt.figure(figsize=FIGURE_SIZE)
+        librosa.display.specshow(mfcc_db, sr=sr, hop_length=HOP_LENGTH, x_axis='time')
+        plt.title(f"Example MFCC Graph")
+        plt.colorbar(format="%+2.0f dB")
+        plt.savefig(path, bbox_inches="tight", pad_inches=0)
+        plt.close()
+        return None
+
 def get_type(name: str):
     """
     Returns the function signature from a given name of a signal processor
@@ -190,6 +206,8 @@ def get_type(name: str):
         return MEL_SPEC
     if name == SPEC_CENTROID.__name__:
         return SPEC_CENTROID
+    if name == MFCC.__name__:
+        return MFCC
 
     raise ValueError(f"Unknown signal processor: {name}")
 
@@ -197,4 +215,4 @@ def get_all_types():
     """
     :return: All signal processors as a list of their names
     """
-    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__, SPEC_CENTROID.__name__]
+    return [CQT.__name__, STFT.__name__, MEL_SPEC.__name__, SPEC_CENTROID.__name__, MFCC.__name__]

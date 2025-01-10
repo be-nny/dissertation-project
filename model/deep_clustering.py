@@ -52,10 +52,10 @@ class DEC(nn.Module):
         return q
 
 class ClusteringModel:
-    def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, n_clusters: int = 10, pre_train_epochs: int = 500):
+    def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, n_clusters: int = 10, pre_train_epochs: int = 500, latent_dim: int = 3):
         self.dataset_loader = dataset_loader
         self.figures_path = self.dataset_loader.get_figures_path()
-        self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=512)
+        self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=128)
         self.logger = logger
         self.n_clusters = n_clusters
 
@@ -67,14 +67,14 @@ class ClusteringModel:
 
         # lstm autoencoder
         input_shape = self.dataset_loader.get_input_shape()
-        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=128, latent_dim=8, num_layers=4).to(self.device)
+        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=256, latent_dim=latent_dim, num_layers=5).to(self.device)
         self.lstm_lr = 1e-4
         self.lstm_optimiser = torch.optim.AdamW(self.lstm_ae.parameters(), self.lstm_lr, weight_decay=1e-2)
-        self.lstm_scheduler = lr_scheduler.StepLR(self.lstm_optimiser, step_size=50, gamma=0.5)
+        self.lstm_scheduler = lr_scheduler.StepLR(self.lstm_optimiser, step_size=100, gamma=0.1)
         self._pre_train(n_epochs=pre_train_epochs)
 
         # dec
-        self.dec = DEC(self.lstm_ae, 10, n_clusters)
+        self.dec = DEC(self.lstm_ae, latent_dim, n_clusters)
         self.dec_lr = 1e-3
         self.dec_optimiser = torch.optim.AdamW(self.dec.parameters(), lr=self.dec_lr)
         self.dec_scheduler = lr_scheduler.StepLR(self.dec_optimiser, step_size=100, gamma=0.1)
@@ -141,7 +141,11 @@ class ClusteringModel:
         ax.set_xlabel("Axis 1")
         ax.set_ylabel("Axis 2")
         ax.set_zlabel("Axis 3")
+        path = os.path.join(self.figures_path, "latent_space.pdf")
+        plt.savefig(path)
+        self.logger.info(f"Saved plot '{path}'")
         plt.show()
+
 
     def train(self, clustering_epochs: int = 500, update_freq: int = 5):
         self.dec.train()
