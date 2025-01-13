@@ -1,40 +1,24 @@
+import logging
+import os
+import matplotlib
+import numpy as np
+import sklearn
 import torch
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.mixture import GaussianMixture
+
+from . import utils
+from matplotlib import pyplot as plt
 from torch import nn
+from torch.optim import lr_scheduler
+from tqdm import tqdm
+from mpl_toolkits.mplot3d import Axes3D
 
-class LSTMAutoencoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim, num_layers=3):
-        super().__init__()
+matplotlib.use('TkAgg')
 
-        # encode
-        self.encoder = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
-        self.hidden_to_latent = nn.Linear(hidden_dim, latent_dim)
-
-        # latent space
-        self.latent_to_hidden = nn.Linear(latent_dim, input_dim)
-        self.latent_to_input = nn.Linear(latent_dim, input_dim)
-
-        # decoder
-        self.decoder = nn.LSTM(input_dim, input_dim, num_layers, batch_first=True)
-
-    def forward(self, x):
-        # encode
-        _, (hidden_state, _) = self.encoder(x)
-        hidden_state = hidden_state[-1]
-        latent = self.hidden_to_latent(hidden_state)
-
-        # decode
-        hidden = self.latent_to_hidden(latent).unsqueeze(0)
-        hidden = hidden.repeat(self.decoder.num_layers, 1, 1)
-        c_0 = torch.zeros_like(hidden)
-
-        latent_seq = self.latent_to_input(latent).unsqueeze(1).repeat(1, x.size(1), 1)
-        reconstructed, _ = self.decoder(latent_seq, (hidden, c_0))
-
-        return latent, reconstructed
-
-
-class AE(nn.Module):
-    def __init__(self, hidden_layers, dropout_rate: float = 0.2):
+class StackedAutoEncoder(nn.Module):
+    def __init__(self, hidden_layers, dropout_rate):
         super().__init__()
 
         # encoder layers
@@ -58,3 +42,140 @@ class AE(nn.Module):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return encoded, decoded
+
+
+class AutoEncoder:
+    def __init__(self, hidden_layers, logger, loader, epochs, figures_path, dropout_rate: float = 0.3):
+        self.sae = StackedAutoEncoder(hidden_layers, dropout_rate)
+        self.epochs = epochs
+        self.logger = logger
+        self.loader = loader
+        self.figures_path = figures_path
+
+        self.input_dim = hidden_layers[0]
+        self.latent_dim = hidden_layers[-1]
+
+        self.lr = 1e-3
+        self.optimiser = torch.optim.AdamW(self.sae.parameters(), self.lr, weight_decay=1e-3)
+        # self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
+
+        if torch.cuda.is_available():
+            self.logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
+        else:
+            self.logger.info("No GPU available. Training will run on CPU.")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def train(self):
+        self.sae.train()
+
+        recon_loss_fn = nn.MSELoss()
+        total_losses = []
+        best_loss = (np.inf, 0)
+
+        tqdm_loop = tqdm(range(self.epochs), desc="Pre-training Autoencoder", unit="epoch")
+        for epoch in tqdm_loop:
+            losses = []
+            for x_data, y_labels in self.loader:
+                self.sae.zero_grad()
+                x_data = x_data.to(self.device)
+                latent, reconstructed = self.sae(x_data)
+
+                reconstruction_loss = recon_loss_fn(reconstructed, x_data)
+
+                losses.append(reconstruction_loss.item())
+                reconstruction_loss.backward()
+
+                self.optimiser.step()
+
+            mean_loss = np.mean(losses)
+            if mean_loss < best_loss[0]:
+                best_loss = (mean_loss, epoch)
+
+            tqdm_loop.set_description(f"Pre-training Autoencoder - Loss={mean_loss}")
+            total_losses.append(mean_loss)
+            # self.scheduler.step()
+
+        self.logger.info(f"Pre-training Autoencoder complete! Best Loss={best_loss[0]}")
+
+        # plot pre-training loss
+        self._plot_loss(epochs=[i for i in range(1, len(total_losses) + 1)], loss_data=total_losses, best_loss=best_loss)
+
+    def regularisation_term(self, latent_space, lamda_term: float = 1e-3):
+        """
+        This is term used for contractive loss that penalises the encoding layer for being
+        too sensitive to small changes in the input data.
+
+        λ * ||J_f(x)||²
+
+        - λ is a hyperparam that controls the strength at which the encoder is penalised
+        - J_f(x) is the Jacobian matrix of the latent_Space
+
+        :param latent_space: latent representation of the encoded data
+        :param lamda_term: hyperparam that controls the strength at which the encoder is penalised
+        :return:
+        """
+
+        jacobian = torch.zeros(self.loader.batch_size, self.latent_dim, self.input_dim, device=self.device)
+        for i in range(self.latent_dim):
+            grad = torch.autograd.grad(
+                outputs=latent_space[:, i],
+                inputs=latent_space,
+                grad_outputs=torch.ones_like(latent_space[:, i]),
+                create_graph=True,
+                retain_graph=True,
+            )[0]
+            jacobian[:, i, :] = grad.view(self.input_dim, -1)
+
+        jacobian_norm = torch.sum(jacobian**2)
+
+        return lamda_term * jacobian_norm
+
+
+
+    def model(self):
+        return self.sae
+
+    def _plot_loss(self, loss_data, epochs, best_loss):
+        path = os.path.join(self.figures_path, "pre-training_loss.pdf")
+
+        plt.figure(figsize=(10, 10))
+        plt.plot(epochs, loss_data, color="blue", label="Loss")
+        plt.plot(best_loss[1], best_loss[0], "o", color="red", label=f"Best Loss:{best_loss[0]}")
+        plt.title("Stacked Autoencoder Loss")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.legend()
+        plt.savefig(path)
+        plt.close()
+
+        self.logger.info(f"Saved plot '{path}'")
+
+    def _plot_latent_space(self):
+        latent_space = []
+        labels = []
+
+        for x, y in self.loader:
+            x = x.to(self.device)
+            latent, _ = self.sae(x)
+            latent_space.extend(latent.detach().cpu().numpy())
+            labels.extend(y.cpu().numpy())
+
+        latent_space = np.array(latent_space)
+        labels = np.array(labels)
+
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        scatter = ax.scatter(
+            latent_space[:, 0], latent_space[:, 1], latent_space[:, 2],
+            c=labels, cmap='viridis', alpha=0.7, s=10
+        )
+
+        cbar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
+        ax.set_title("3D Plot of Latent Space")
+        ax.set_xlabel("Axis 1")
+        ax.set_ylabel("Axis 2")
+        ax.set_zlabel("Axis 3")
+        path = os.path.join(self.figures_path, "latent_space.pdf")
+        plt.savefig(path)
+        self.logger.info(f"Saved plot '{path}'")
+        plt.show()
