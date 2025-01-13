@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - DEEP EMBEDDED
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-e", "--experiment", required=True, help="Experiment to run")
+parser.add_argument("-e", "--experiment", type=int,required=True, help="Experiment to run")
 
 def show_info(logger, config):
     datasets = os.listdir(config.OUTPUT_PATH)
@@ -120,7 +120,9 @@ if __name__ == "__main__":
 
     if args.uuid:
         if args.experiment == 1:
+            logger.info("Running Experiment 1")
             experiment_1(config, logger, args)
         if args.experiment == 2:
+            logger.info("Running Experiment 2")
             experiment_2(config, logger, args)
 
