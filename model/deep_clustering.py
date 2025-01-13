@@ -55,7 +55,7 @@ class ClusteringModel:
     def __init__(self, dataset_loader: utils.Loader, logger: logging.Logger, n_clusters: int = 10, pre_train_epochs: int = 500, latent_dim: int = 3):
         self.dataset_loader = dataset_loader
         self.figures_path = self.dataset_loader.get_figures_path()
-        self.dataloader = self.dataset_loader.get_dataloader(split_type="train", batch_size=128)
+        self.dataloader = self.dataset_loader.load(split_type="train", batch_size=128)
         self.logger = logger
         self.n_clusters = n_clusters
 
@@ -67,9 +67,9 @@ class ClusteringModel:
 
         # lstm autoencoder
         input_shape = self.dataset_loader.get_input_shape()
-        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=256, latent_dim=latent_dim, num_layers=5).to(self.device)
+        self.lstm_ae = autoencoder.LSTMAutoencoder(input_dim=input_shape[1], hidden_dim=128, latent_dim=latent_dim, num_layers=4).to(self.device)
         self.lstm_lr = 1e-4
-        self.lstm_optimiser = torch.optim.AdamW(self.lstm_ae.parameters(), self.lstm_lr, weight_decay=1e-2)
+        self.lstm_optimiser = torch.optim.AdamW(self.lstm_ae.parameters(), self.lstm_lr, weight_decay=1e-3)
         self.lstm_scheduler = lr_scheduler.StepLR(self.lstm_optimiser, step_size=100, gamma=0.1)
         self._pre_train(n_epochs=pre_train_epochs)
 
