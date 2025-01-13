@@ -26,11 +26,12 @@ class ReceiptReader:
         return
 
 class Loader:
-    def __init__(self, uuid: str, out: str, logger):
+    def __init__(self, uuid: str, out: str, logger, batch_size: int = 512):
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
         self.logger = logger
         self.input_shape = None
+        self.batch_size = batch_size
 
         # creating the test/train arrays
         self.test_split = self._make_splits(split_type="test")
@@ -62,17 +63,8 @@ class Loader:
     def get_input_shape(self):
         return self.input_shape
 
-    def get_data(self):
-        data, genre_labels = self.get_data_split(split_type='train')
-        tmp_d, tmp_g = self.get_data_split(split_type='test')
-
-        data.extend(tmp_d)
-        genre_labels.extend(tmp_g)
-
-        return data, genre_labels
-
-    def get_dataloader(self, split_type: str, batch_size: int = 512):
-        data, labels = self.get_data_split(split_type=split_type)
+    def load(self, split_type: str):
+        data, labels = self._get_data_split(split_type=split_type)
 
         data = np.array(data)
 
@@ -83,13 +75,13 @@ class Loader:
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
 
         dataset = TensorDataset(data_tensor, labels_tensor)
-        dataloader = DataLoader(dataset, batch_size=batch_size)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
         self.input_shape = np.array(data[0]).shape
 
         return dataloader
 
-    def get_data_split(self, split_type):
+    def _get_data_split(self, split_type):
         """
         This returns a shuffled dataset containing either test or train data from a dataset. This returns an array
         (num_samples, num_features) that are normalised using decimal scaling, and the genre tags (num_samples,) as
@@ -110,26 +102,39 @@ class Loader:
 
         for i in tqdm(range(0, len(split)), unit="file", desc=f"Loading {split_type} data from '{self.uuid}'"):
             with (h5py.File(split[i], "r") as hdf_file):
-                layers = np.array(hdf_file["signal"])
+                signal = np.array(hdf_file["signal"])
                 b_genre = hdf_file["genre"][()]
                 genre = b_genre.decode("utf-8")
 
-                # removing any nan values
-                layers = np.nan_to_num(layers, nan=0.0, posinf=1e9, neginf=-1e9)
-
-                signal_data.append(layers)
+                signal_data.append(signal)
                 genre_labels.append(genre)
 
                 hdf_file.close()
 
         signal_data = np.array(signal_data)
-        return signal_data, genre_labels
 
-    def get_genres(self):
-        return self.genres
+        return self._normalise(signal_data), genre_labels
 
-    def get_directory(self):
-        return self.root
+    @staticmethod
+    def _normalise(signal_data: np.array) -> np.array:
+        """
+        Normalises the signals by subtracting the mean signal and dividing by the standard deviation. The mean signal
+        is a 2D array, and the standard deviation is a single scalar.
+
+        :param signal_data: signal data to be normalised (shape: [s,n,m])
+        :return: normalised signal of size (shape: [s,n,m])
+        """
+
+        std = np.std(signal_data)
+        mean = np.mean(signal_data, axis=0)
+
+        normalised_signal = (signal_data - mean) / std
+
+        return normalised_signal
 
     def get_figures_path(self):
+        """
+        :return: The figures directory inside the UUID's path
+        """
+
         return os.path.join(self.root, 'figures')

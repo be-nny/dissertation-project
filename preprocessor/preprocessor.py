@@ -159,8 +159,8 @@ class Preprocessor:
                 # generate the desired audio spectrogram
                 raw_signal = self.signal_processor(segment, sr)
 
-                # scalar = MinMaxScaler(feature_range=(-3, 3))
-                # raw_signal = scalar.fit_transform(raw_signal)
+                scalar = MinMaxScaler(feature_range=(-3, 3))
+                raw_signal = scalar.fit_transform(raw_signal)
 
                 # save the layers to HDF5 file
                 file_name = os.path.join(output_dir, f"{name}_{count}.h5")
