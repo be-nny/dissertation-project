@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import normalized_mutual_info_score, silhouette_score
 from sklearn.mixture import GaussianMixture
 from torch.utils.data import TensorDataset, DataLoader
-from experimental_models import pca, stacked_autoencoder
+from experimental_models import pca, stacked_autoencoder, conv_autoencoder
 from model import utils
 
 matplotlib.use('TkAgg')
@@ -29,7 +29,7 @@ def show_info(logger, config):
     datasets = os.listdir(config.OUTPUT_PATH)
 
     for uuid in datasets:
-        if uuid[0] != ".":
+        if uuid[0] != "." and uuid != "experiments":
             path = os.path.join(config.OUTPUT_PATH, uuid)
             with open(os.path.join(path, "receipt.json"), "r") as f:
                 data = json.load(f)
@@ -85,6 +85,23 @@ def visualise_3D(latent_space, y_true, path):
     plt.savefig(path)
     plt.show()
 
+def experiment_5(config, logger, args, experiment_path):
+    # load the data
+    batch_size = 128
+    epochs = 1000
+    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
+
+    conv_ae = conv_autoencoder.ConvAutoencoder(
+        loader=loader.load(split_type="train", normalise=True),
+        logger=logger,
+        uuid=args.uuid,
+        figures_path=experiment_path,
+        epochs=epochs,
+        layer_sizes=[loader.input_shape[0], 32, 64, 128]
+    )
+
+    conv_ae.train_autoencoder()
+
 def experiment_4(config, logger, args, experiment_path):
     # load the data
     batch_size = 512
@@ -103,7 +120,7 @@ def experiment_4(config, logger, args, experiment_path):
     train_labels = np.array(train_labels)
 
     # run UMAP on input signals
-    mapper = umap.UMAP(n_components=umap_components, n_neighbors=20, min_dist=0.3)
+    mapper = umap.UMAP(min_dist=0.0, spread=3, n_components=umap_components, n_neighbors=15, local_connectivity=3)
     train_umap_space = mapper.fit_transform(train_data)
 
     # create torch dataset loader
@@ -114,7 +131,7 @@ def experiment_4(config, logger, args, experiment_path):
 
     # parsing this into an autoencoder
     hidden_layers = [umap_components, 512, 256, 16, latent_dims]
-    sae = stacked_autoencoder.AutoEncoder(
+    sae = stacked_autoencoder.SAE(
         hidden_layers=hidden_layers,
         logger=logger,
         loader=train_data_loader,
@@ -218,7 +235,7 @@ def experiment_2(config, logger, args, experiment_path):
 
     # parsing this into an autoencoder
     hidden_layers = [pca_components, 2048, 1024, 128, latent_dims]
-    sae = stacked_autoencoder.AutoEncoder(
+    sae = stacked_autoencoder.SAE(
         hidden_layers=hidden_layers,
         logger=logger,
         loader=reduced_loader,
@@ -338,3 +355,11 @@ if __name__ == "__main__":
 
             logger.info("Running Experiment 4")
             experiment_4(config, logger, args, exp_4_path)
+
+        if args.experiment == 5:
+            exp_5_path = os.path.join(experiments_dir, "experiment_5")
+            if not os.path.exists(exp_5_path):
+                os.mkdir(exp_5_path)
+
+            logger.info("Running Experiment 5")
+            experiment_5(config, logger, args, exp_5_path)

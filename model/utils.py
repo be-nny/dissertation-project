@@ -60,9 +60,6 @@ class Loader:
         np.random.shuffle(split)
         return split
 
-    def get_input_shape(self):
-        return self.input_shape
-
     def load(self, split_type: str, normalise: bool = True):
         if split_type == "all":
             d1, l1 = self._get_data_split(split_type="test", normalise=normalise)
@@ -81,7 +78,7 @@ class Loader:
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
 
         dataset = TensorDataset(data_tensor, labels_tensor)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size)
 
         self.input_shape = np.array(data[0]).shape
 
