@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import normalized_mutual_info_score, silhouette_score
 from sklearn.mixture import GaussianMixture
 from torch.utils.data import TensorDataset, DataLoader
-from model import utils, pca, stacked_autoencoder
+from experimental_models import utils, pca, stacked_autoencoder
 
 matplotlib.use('TkAgg')
 
