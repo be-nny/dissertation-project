@@ -1,19 +1,12 @@
-import logging
 import os
 import matplotlib
 import numpy as np
-import sklearn
 import torch
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.mixture import GaussianMixture
 
-from . import utils
 from matplotlib import pyplot as plt
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
-from mpl_toolkits.mplot3d import Axes3D
 
 matplotlib.use('TkAgg')
 
