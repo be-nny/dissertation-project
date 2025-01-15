@@ -18,7 +18,7 @@ parser.add_argument("-f", "--figures", action="store", default=1, type=int, help
 # parser.add_argument("-sr", "--scale_range", required=True, type=tuple, help="range to scale between")
 
 if __name__ == "__main__":
-    args = parser.parse_args(["--config=config.yml", "--signal_processor=MEL_SPEC"])
+    args = parser.parse_args()
     logger = logger.get_logger()
 
     # load config file

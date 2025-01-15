@@ -17,7 +17,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 matplotlib.use('TkAgg')
 
-class StackedAutoEncoder(nn.Module):
+class StackedAutoEncoderModel(nn.Module):
     def __init__(self, hidden_layers, dropout_rate):
         super().__init__()
 
@@ -44,9 +44,10 @@ class StackedAutoEncoder(nn.Module):
         return encoded, decoded
 
 
-class AutoEncoder:
-    def __init__(self, hidden_layers, logger, loader, epochs, figures_path, dropout_rate: float = 0.3):
-        self.sae = StackedAutoEncoder(hidden_layers, dropout_rate)
+class AutoEncoder(StackedAutoEncoderModel):
+    def __init__(self, uuid, hidden_layers, logger, loader, epochs, figures_path, dropout_rate: float = 0.3):
+        super().__init__(hidden_layers, dropout_rate)
+        self.uuid = uuid
         self.epochs = epochs
         self.logger = logger
         self.loader = loader
@@ -56,8 +57,8 @@ class AutoEncoder:
         self.latent_dim = hidden_layers[-1]
 
         self.lr = 1e-3
-        self.optimiser = torch.optim.AdamW(self.sae.parameters(), self.lr, weight_decay=1e-3)
-        # self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
+        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-3)
+        self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
 
         if torch.cuda.is_available():
             self.logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
@@ -65,20 +66,20 @@ class AutoEncoder:
             self.logger.info("No GPU available. Training will run on CPU.")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def train(self):
-        self.sae.train()
+    def train_autoencoder(self):
+        self.train()
 
         recon_loss_fn = nn.MSELoss()
         total_losses = []
         best_loss = (np.inf, 0)
 
-        tqdm_loop = tqdm(range(self.epochs), desc="Pre-training Autoencoder", unit="epoch")
+        tqdm_loop = tqdm(range(self.epochs), desc="Training Autoencoder", unit="epoch")
         for epoch in tqdm_loop:
             losses = []
             for x_data, y_labels in self.loader:
-                self.sae.zero_grad()
+                self.zero_grad()
                 x_data = x_data.to(self.device)
-                latent, reconstructed = self.sae(x_data)
+                latent, reconstructed = self(x_data)
 
                 reconstruction_loss = recon_loss_fn(reconstructed, x_data)
 
@@ -91,11 +92,11 @@ class AutoEncoder:
             if mean_loss < best_loss[0]:
                 best_loss = (mean_loss, epoch)
 
-            tqdm_loop.set_description(f"Pre-training Autoencoder - Loss={mean_loss}")
+            tqdm_loop.set_description(f"Training Autoencoder - Loss={mean_loss}")
             total_losses.append(mean_loss)
             # self.scheduler.step()
 
-        self.logger.info(f"Pre-training Autoencoder complete! Best Loss={best_loss[0]}")
+        self.logger.info(f"Training Autoencoder complete! Best Loss={best_loss[0]}")
 
         # plot pre-training loss
         self._plot_loss(epochs=[i for i in range(1, len(total_losses) + 1)], loss_data=total_losses, best_loss=best_loss)
@@ -130,13 +131,11 @@ class AutoEncoder:
 
         return lamda_term * jacobian_norm
 
-
-
     def model(self):
-        return self.sae
+        return self
 
     def _plot_loss(self, loss_data, epochs, best_loss):
-        path = os.path.join(self.figures_path, "pre-training_loss.pdf")
+        path = os.path.join(self.figures_path, f"{self.uuid}_loss.pdf")
 
         plt.figure(figsize=(10, 10))
         plt.plot(epochs, loss_data, color="blue", label="Loss")
@@ -156,7 +155,7 @@ class AutoEncoder:
 
         for x, y in self.loader:
             x = x.to(self.device)
-            latent, _ = self.sae(x)
+            latent, _ = self(x)
             latent_space.extend(latent.detach().cpu().numpy())
             labels.extend(y.cpu().numpy())
 

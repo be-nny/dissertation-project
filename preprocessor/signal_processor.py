@@ -16,7 +16,7 @@ plt.figure()
 plt.close()
 
 FIGURE_SIZE = (10, 10)
-N_FFT = 2048
+N_FFT = 512
 NPERSEG = 256
 HOP_LENGTH = 512
 N_MELS = 128

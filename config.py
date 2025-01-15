@@ -1,3 +1,5 @@
+import os
+
 import yaml
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
@@ -30,4 +32,3 @@ class Config:
         self.TARGET_LENGTH = yml_data["preprocessor_config"]["target_length"]
         self.SEGMENT_DURATION = yml_data["preprocessor_config"]["segment_duration"]
         self.TRAIN_SPLIT = yml_data["preprocessor_config"]["train_split"]
-

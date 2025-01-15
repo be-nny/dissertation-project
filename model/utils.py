@@ -63,8 +63,14 @@ class Loader:
     def get_input_shape(self):
         return self.input_shape
 
-    def load(self, split_type: str):
-        data, labels = self._get_data_split(split_type=split_type)
+    def load(self, split_type: str, normalise: bool = True):
+        if split_type == "all":
+            d1, l1 = self._get_data_split(split_type="test", normalise=normalise)
+            d2, l2 = self._get_data_split(split_type="train", normalise=normalise)
+            data = np.concatenate((d1, d2), axis=0)
+            labels = np.concatenate((l1, l2), axis=0)
+        else:
+            data, labels = self._get_data_split(split_type=split_type, normalise=normalise)
 
         data = np.array(data)
 
@@ -81,7 +87,7 @@ class Loader:
 
         return dataloader
 
-    def _get_data_split(self, split_type):
+    def _get_data_split(self, split_type, normalise: bool):
         """
         This returns a shuffled dataset containing either test or train data from a dataset. This returns an array
         (num_samples, num_features) that are normalised using decimal scaling, and the genre tags (num_samples,) as
@@ -113,7 +119,10 @@ class Loader:
 
         signal_data = np.array(signal_data)
 
-        return self._normalise(signal_data), genre_labels
+        if normalise:
+            signal_data = self._normalise(signal_data)
+
+        return signal_data, genre_labels
 
     @staticmethod
     def _normalise(signal_data: np.array) -> np.array:

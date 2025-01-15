@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
-from . import autoencoder
+from . import stacked_autoencoder
 from mpl_toolkits.mplot3d import Axes3D
 
 matplotlib.use('TkAgg')
