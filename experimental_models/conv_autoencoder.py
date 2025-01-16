@@ -7,8 +7,6 @@ from matplotlib import pyplot as plt
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
-from torchsummary import summary
-
 
 matplotlib.use('TkAgg')
 
@@ -16,18 +14,18 @@ matplotlib.use('TkAgg')
 class _ConvAutoEncoderModel(nn.Module):
     def __init__(self, layer_sizes):
         super().__init__()
+        self.layer_sizes = layer_sizes
 
         encoder_layers = []
-        for i in range(0, len(layer_sizes) - 1):
-            encoder_layers.append(nn.Conv1d(layer_sizes[i], layer_sizes[i+1], kernel_size=2, stride=1, padding=1))
+        for i in range(0, len(self.layer_sizes) - 1):
+            encoder_layers.append(nn.Conv1d(self.layer_sizes[i], self.layer_sizes[i+1], kernel_size=3, stride=2, padding=1))
             encoder_layers.append(nn.ReLU())
-            encoder_layers.append(nn.MaxPool1d(kernel_size=2, stride=1, padding=0))
+            encoder_layers.append(nn.MaxPool1d(kernel_size=2, stride=2, padding=1))
 
-        # defining decoder layers
-        layer_sizes = layer_sizes[::-1]
+        reversed_layers = self.layer_sizes[::-1]
         decoder_layers = []
-        for i in range(0, len(layer_sizes) - 1):
-            decoder_layers.append(nn.ConvTranspose1d(layer_sizes[i], layer_sizes[i + 1], kernel_size=3, stride=1, padding=1, output_padding=0))
+        for i in range(0, len(self.layer_sizes) - 1):
+            decoder_layers.append(nn.ConvTranspose1d(reversed_layers[i], reversed_layers[i + 1], kernel_size=4, stride=4, padding=1, output_padding=0))
             decoder_layers.append(nn.ReLU())
         decoder_layers.append(nn.Sigmoid())
 
@@ -35,9 +33,18 @@ class _ConvAutoEncoderModel(nn.Module):
         self.decoder = nn.Sequential(*decoder_layers)
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+
+        # ensuring the decoded shape matches
+        if decoded.shape[2] > x.shape[2]:
+            decoded = decoded[..., :x.shape[2]]
+        elif decoded.shape[2] < x.shape[2]:
+            pad_length = x.shape[2] - decoded.shape[2]
+            decoded = nn.functional.pad(decoded, (0, pad_length))
+
+        return encoded, decoded
+
 
 class ConvAutoencoder(_ConvAutoEncoderModel):
     def __init__(self, layer_sizes, uuid, logger, loader, epochs, figures_path):
@@ -49,8 +56,8 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
         self.epochs = epochs
         self.figures_path = figures_path
 
-        self.lr = 1e-3
-        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-4)
+        self.lr = 1e-4
+        self.optimiser = torch.optim.Adam(self.parameters(), self.lr)
         self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
 
         if torch.cuda.is_available():
@@ -77,8 +84,7 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
                 x_data = nn.functional.pad(x_data, (0, 0, 0, 0, 0, pad_size))
 
                 x_data = x_data.to(self.device)
-                reconstructed = self(x_data)
-
+                latent, reconstructed = self(x_data)
                 reconstruction_loss = recon_loss_fn(reconstructed, x_data)
 
                 losses.append(reconstruction_loss.item())

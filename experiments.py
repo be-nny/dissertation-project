@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS',
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-e", "--experiment", type=int, help="Experiment to run")
+parser.add_argument("-e", "--experiment", type=str, help="Experiment to run")
 
 def show_info(logger, config):
     datasets = os.listdir(config.OUTPUT_PATH)
@@ -87,7 +87,7 @@ def visualise_3D(latent_space, y_true, path):
 
 def experiment_5(config, logger, args, experiment_path):
     # load the data
-    batch_size = 128
+    batch_size = 512
     epochs = 1000
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
 
@@ -97,7 +97,7 @@ def experiment_5(config, logger, args, experiment_path):
         uuid=args.uuid,
         figures_path=experiment_path,
         epochs=epochs,
-        layer_sizes=[loader.input_shape[0], 32, 64, 128]
+        layer_sizes=[loader.input_shape[0], 64, 32, 8]
     )
 
     conv_ae.train_autoencoder()
@@ -106,7 +106,7 @@ def experiment_4(config, logger, args, experiment_path):
     # load the data
     batch_size = 512
     umap_components = 64
-    latent_dims = 4
+    latent_dims = 3
 
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
     train_data = []
@@ -185,6 +185,8 @@ def experiment_4(config, logger, args, experiment_path):
 def experiment_3(config, logger, args, experiment_path):
     # load the data
     batch_size = 512
+    latent_dims = 3
+
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
     data = []
     y_true = []
@@ -197,7 +199,7 @@ def experiment_3(config, logger, args, experiment_path):
     y_true = np.array(y_true)
 
     # run UMAP on input signals
-    latent_space = umap.UMAP(min_dist=0.0, spread=3, n_components=3, n_neighbors=15, local_connectivity=3).fit_transform(reshaped_data)
+    latent_space = umap.UMAP(min_dist=0.0, spread=3, n_components=latent_dims, n_neighbors=15, local_connectivity=3).fit_transform(reshaped_data)
 
     # cluster scores
     cluster_info(y_true=y_true, logger=logger, n_clusters=10, latent_space=latent_space)
@@ -211,8 +213,8 @@ def experiment_2(config, logger, args, experiment_path):
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
 
     # creating pca model
-    pca_components = 50
-    latent_dims = 5
+    pca_components = 32
+    latent_dims = 3
     pca_model = pca.PCAModel(logger=logger, output_path=experiment_path,
                              n_components=pca_components, uuid=args.uuid)
     data = []
@@ -291,7 +293,7 @@ def experiment_1(config, logger, args, experiment_path):
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
 
     # creating pca model
-    pca_components = 3
+    pca_components = 32
     pca_model = pca.PCAModel(logger=logger, output_path=experiment_path, n_components=pca_components, uuid=args.uuid)
     data = []
     y_true = []
@@ -318,7 +320,6 @@ if __name__ == "__main__":
     config = config.Config(path=args.config)
     logger = logger.get_logger()
 
-    #
     experiments_dir = os.path.join(config.OUTPUT_PATH, "experiments")
     if not os.path.exists(experiments_dir):
         os.mkdir(experiments_dir)
@@ -327,28 +328,29 @@ if __name__ == "__main__":
         show_info(logger, config)
 
     if args.uuid:
-        if args.experiment == 1:
+        experiments = [int(i) for i in args.experiment.split(",")]
+        if 1 in experiments:
             exp_1_path = os.path.join(experiments_dir, "experiment_1")
             if not os.path.exists(exp_1_path):
                 os.mkdir(exp_1_path)
 
             logger.info("Running Experiment 1")
             experiment_1(config, logger, args, exp_1_path)
-        if args.experiment == 2:
+        if 2 in experiments:
             exp_2_path = os.path.join(experiments_dir, "experiment_2")
             if not os.path.exists(exp_2_path):
                 os.mkdir(exp_2_path)
 
             logger.info("Running Experiment 2")
             experiment_2(config, logger, args, exp_2_path)
-        if args.experiment == 3:
+        if 3 in experiments:
             exp_3_path = os.path.join(experiments_dir, "experiment_3")
             if not os.path.exists(exp_3_path):
                 os.mkdir(exp_3_path)
 
             logger.info("Running Experiment 3")
             experiment_3(config, logger, args, exp_3_path)
-        if args.experiment == 4:
+        if 4 in experiments:
             exp_4_path = os.path.join(experiments_dir, "experiment_4")
             if not os.path.exists(exp_4_path):
                 os.mkdir(exp_4_path)
@@ -356,7 +358,7 @@ if __name__ == "__main__":
             logger.info("Running Experiment 4")
             experiment_4(config, logger, args, exp_4_path)
 
-        if args.experiment == 5:
+        if 5 in experiments:
             exp_5_path = os.path.join(experiments_dir, "experiment_5")
             if not os.path.exists(exp_5_path):
                 os.mkdir(exp_5_path)

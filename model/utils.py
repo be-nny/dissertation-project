@@ -1,7 +1,6 @@
 import json
 import os
 import h5py
-import matplotlib
 import numpy as np
 from tqdm import tqdm
 import torch
