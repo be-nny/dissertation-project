@@ -1,3 +1,6 @@
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import argparse
 import json
 import os.path
@@ -90,14 +93,15 @@ def experiment_5(config, logger, args, experiment_path):
     batch_size = 512
     epochs = 1000
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
-
+    batch_loader = loader.load(split_type="train", normalise=True)
     conv_ae = conv_autoencoder.ConvAutoencoder(
-        loader=loader.load(split_type="train", normalise=True),
+        loader=batch_loader,
         logger=logger,
         uuid=args.uuid,
         figures_path=experiment_path,
         epochs=epochs,
-        layer_sizes=[loader.input_shape[0], 64, 32, 8]
+        n_layers=[loader.input_shape[0], loader.input_shape[0]*2, loader.input_shape[0]*3],
+        input_shape = loader.input_shape,
     )
 
     conv_ae.train_autoencoder()

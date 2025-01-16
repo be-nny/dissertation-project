@@ -1,3 +1,4 @@
+import math
 import os
 import matplotlib
 import numpy as np
@@ -12,43 +13,57 @@ matplotlib.use('TkAgg')
 
 
 class _ConvAutoEncoderModel(nn.Module):
-    def __init__(self, layer_sizes):
+    def __init__(self, n_layers, input_shape, latent_dim=10):
         super().__init__()
-        self.layer_sizes = layer_sizes
+        self.n_layers = n_layers
+        k_s = 3
+        s = 2
+        p = 1
 
+        # conv encoder
         encoder_layers = []
-        for i in range(0, len(self.layer_sizes) - 1):
-            encoder_layers.append(nn.Conv1d(self.layer_sizes[i], self.layer_sizes[i+1], kernel_size=3, stride=2, padding=1))
-            encoder_layers.append(nn.ReLU())
-            encoder_layers.append(nn.MaxPool1d(kernel_size=2, stride=2, padding=1))
+        self.current_length = input_shape[1]
+        for i in range(0, len(n_layers) - 1):
+            # work out the size after conv and max pool is applied
+            self.current_length = (self.current_length + 2 * p - k_s) // s + 1
+            self.current_length = (self.current_length + 2 * p - k_s) // s + 1
 
-        reversed_layers = self.layer_sizes[::-1]
+            encoder_layers.append(nn.Conv1d(n_layers[i], n_layers[i + 1], kernel_size=k_s, stride=s, padding=p))
+            encoder_layers.append(nn.LeakyReLU())
+            encoder_layers.append(nn.MaxPool1d(kernel_size=k_s, stride=s, padding=p))
+
+        # adding FCN
+        encoder_layers.append(nn.Flatten())
+        encoder_layers.append(nn.Linear(self.current_length*n_layers[-1], latent_dim))
+        encoder_layers.append(nn.LeakyReLU())
+
+        # conv decoder
+        reversed_layers = n_layers[::-1]
+        decoder_layers = [
+            nn.Linear(latent_dim, self.current_length*n_layers[-1]),
+            nn.LeakyReLU()
+        ]
+        self.linear_decoder = nn.Sequential(*decoder_layers)
+
         decoder_layers = []
-        for i in range(0, len(self.layer_sizes) - 1):
-            decoder_layers.append(nn.ConvTranspose1d(reversed_layers[i], reversed_layers[i + 1], kernel_size=4, stride=4, padding=1, output_padding=0))
-            decoder_layers.append(nn.ReLU())
-        decoder_layers.append(nn.Sigmoid())
+        for i in range(0, len(reversed_layers) - 1):
+            decoder_layers.append(nn.ConvTranspose1d(reversed_layers[i], reversed_layers[i + 1], kernel_size=4, stride=4, padding=2, output_padding=3))
+            decoder_layers.append(nn.LeakyReLU())
 
         self.encoder = nn.Sequential(*encoder_layers)
         self.decoder = nn.Sequential(*decoder_layers)
 
     def forward(self, x):
         encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-
-        # ensuring the decoded shape matches
-        if decoded.shape[2] > x.shape[2]:
-            decoded = decoded[..., :x.shape[2]]
-        elif decoded.shape[2] < x.shape[2]:
-            pad_length = x.shape[2] - decoded.shape[2]
-            decoded = nn.functional.pad(decoded, (0, pad_length))
-
+        linear = self.linear_decoder(encoded)
+        linear_reshaped = linear.view(linear.size(0), self.n_layers[-1], self.current_length)
+        decoded = self.decoder(linear_reshaped)
         return encoded, decoded
 
 
 class ConvAutoencoder(_ConvAutoEncoderModel):
-    def __init__(self, layer_sizes, uuid, logger, loader, epochs, figures_path):
-        super().__init__(layer_sizes)
+    def __init__(self, n_layers, input_shape, uuid, logger, loader, epochs, figures_path):
+        super().__init__(n_layers=n_layers, input_shape=input_shape)
 
         self.uuid = uuid
         self.logger = logger
@@ -56,8 +71,8 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
         self.epochs = epochs
         self.figures_path = figures_path
 
-        self.lr = 1e-4
-        self.optimiser = torch.optim.Adam(self.parameters(), self.lr)
+        self.lr = 1e-3
+        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-3)
         self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
 
         if torch.cuda.is_available():
@@ -66,8 +81,10 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
             self.logger.info("No GPU available. Training will run on CPU.")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
     def train_autoencoder(self):
         self.train()
+        self.to(self.device)
 
         recon_loss_fn = nn.MSELoss()
         total_losses = []
@@ -85,6 +102,9 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
 
                 x_data = x_data.to(self.device)
                 latent, reconstructed = self(x_data)
+
+                # the reconstructed data must be the same size, pad it
+                reconstructed = nn.functional.pad(reconstructed, (0, 1))
                 reconstruction_loss = recon_loss_fn(reconstructed, x_data)
 
                 losses.append(reconstruction_loss.item())
@@ -110,7 +130,7 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
         plt.figure(figsize=(10, 10))
         plt.plot(epochs, loss_data, color="blue", label="Loss")
         plt.plot(best_loss[1], best_loss[0], "o", color="red", label=f"Best Loss:{best_loss[0]}")
-        plt.title("Stacked Autoencoder Loss")
+        plt.title("Convolutional Autoencoder Loss")
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
         plt.legend()
