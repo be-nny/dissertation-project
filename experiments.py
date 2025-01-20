@@ -1,4 +1,6 @@
 import os
+from sklearn.decomposition import PCA
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from tqdm import tqdm
@@ -19,7 +21,7 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import normalized_mutual_info_score, silhouette_score
 from sklearn.mixture import GaussianMixture
 from torch.utils.data import TensorDataset, DataLoader
-from experimental_models import pca, stacked_autoencoder, conv_autoencoder
+from experimental_models import stacked_autoencoder, conv_autoencoder
 from model import utils
 
 matplotlib.use('TkAgg')
@@ -146,7 +148,7 @@ def plot_2d_kmeans(latent_space, kmeans, logger, path, genre_filter, y_true, loa
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
-def plot_eigenvalues(path, pca_model: pca.PCA, logger):
+def plot_eigenvalues(path, pca_model: PCA, logger):
     plt.plot([i for i in range(1, pca_model.n_components + 1)], pca_model.explained_variance_, marker="o", linestyle="-",label="Eigenvalues")
     plt.xlabel("Number of Components")
     plt.ylabel("Eigenvalues (log)")
@@ -158,7 +160,7 @@ def plot_eigenvalues(path, pca_model: pca.PCA, logger):
     logger.info(f"Saved plot '{path}'")
 
 
-def analyse_latent_dims(dim_reducer: pca.PCA | umap.UMAP, loader, logger, path, title, n_clusters=10, max_components=100):
+def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, title, n_clusters=10, max_components=100):
     data = []
     y_true = []
 
@@ -248,7 +250,7 @@ if __name__ == "__main__":
 
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
 
-            pca_model = pca.PCA()
+            pca_model = PCA()
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_pca_latent_dims_analysis.pdf")
             logger.info("Latent space analysis for PCA")
             analyse_latent_dims(dim_reducer=pca_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for PCA")
@@ -265,7 +267,7 @@ if __name__ == "__main__":
 
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
 
-            pca_model = pca.PCA(n_components=args.experiment_2)
+            pca_model = PCA(n_components=args.experiment_2)
             data = []
             batch_loader = loader.load(split_type="all", normalise=True)
             print(loader.input_shape)
@@ -302,7 +304,7 @@ if __name__ == "__main__":
                 data.extend(flattened)
                 y_true.extend(y)
 
-            pca_model = pca.PCA(n_components=2)
+            pca_model = PCA(n_components=2)
             pca_latent = pca_model.fit_transform(data)
 
             kmeans = KMeans(n_clusters=n_clusters)
