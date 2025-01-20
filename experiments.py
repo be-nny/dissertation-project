@@ -1,11 +1,8 @@
 import os
-from cProfile import label
-
-import pandas as pd
-from tqdm import tqdm
-from typer.rich_utils import print_with_rich
-
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+from tqdm import tqdm
+
 
 import argparse
 import json
