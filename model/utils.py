@@ -18,6 +18,9 @@ class ReceiptReader:
             data = json.load(f)
             self.genres = data['genres']
             self.signal_processor = data['preprocessor_info']['signal_processor']
+            self.seg_dur = data['preprocessor_info']['segment_duration']
+            self.total_samples = data['preprocessor_info']['total_samples']
+            self.created_time = data['start_time']
 
         return self
 
@@ -31,6 +34,7 @@ class Loader:
         self.logger = logger
         self.input_shape = None
         self.batch_size = batch_size
+        self.label_encoder = LabelEncoder()
 
         # creating the test/train arrays
         self.test_split = self._make_splits(split_type="test")
@@ -59,10 +63,11 @@ class Loader:
         np.random.shuffle(split)
         return split
 
-    def load(self, split_type: str, normalise: bool = True):
+    def load(self, split_type: str, normalise: bool = True, genre_filter: list = []):
+        self.logger.info(f"'normalise' flag set to '{normalise}'")
         if split_type == "all":
-            d1, l1 = self._get_data_split(split_type="test", normalise=normalise)
-            d2, l2 = self._get_data_split(split_type="train", normalise=normalise)
+            d1, l1 = self._get_data_split(split_type="test", normalise=normalise, genre_filter=genre_filter)
+            d2, l2 = self._get_data_split(split_type="train", normalise=normalise, genre_filter=genre_filter)
             data = np.concatenate((d1, d2), axis=0)
             labels = np.concatenate((l1, l2), axis=0)
         else:
@@ -70,8 +75,7 @@ class Loader:
 
         data = np.array(data)
 
-        label_encoder = LabelEncoder()
-        int_labels = label_encoder.fit_transform(labels)
+        int_labels = self.label_encoder.fit_transform(labels)
 
         data_tensor = torch.tensor(data, dtype=torch.float32)
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
@@ -83,7 +87,10 @@ class Loader:
 
         return dataloader
 
-    def _get_data_split(self, split_type, normalise: bool):
+    def decode_label(self, labels):
+        return self.label_encoder.inverse_transform(labels)
+
+    def _get_data_split(self, split_type, normalise: bool, genre_filter: list):
         """
         This returns a shuffled dataset containing either test or train data from a dataset. This returns an array
         (num_samples, num_features) that are normalised using decimal scaling, and the genre tags (num_samples,) as
@@ -102,14 +109,22 @@ class Loader:
         signal_data = []
         genre_labels = []
 
+        if genre_filter != []:
+            self.logger.info(f"Loading files with genres:  {', '.join(genre_filter)}")
+        else:
+            self.logger.info(f"No Genre filters specified. Loading all genres")
+
         for i in tqdm(range(0, len(split)), unit="file", desc=f"Loading {split_type} data from '{self.uuid}'"):
             with (h5py.File(split[i], "r") as hdf_file):
-                signal = np.array(hdf_file["signal"])
                 b_genre = hdf_file["genre"][()]
                 genre = b_genre.decode("utf-8")
 
-                signal_data.append(signal)
-                genre_labels.append(genre)
+                if genre in genre_filter or genre_filter == []:
+                    signal = np.array(hdf_file["signal"])
+                    signal = np.nan_to_num(signal, nan=111111, posinf=222222)
+
+                    signal_data.append(signal)
+                    genre_labels.append(genre)
 
                 hdf_file.close()
 
@@ -124,7 +139,7 @@ class Loader:
     def _normalise(signal_data: np.array) -> np.array:
         """
         Normalises the signals by subtracting the mean signal and dividing by the standard deviation. The mean signal
-        is a 2D array, and the standard deviation is a single scalar.
+        is a 2D array, and the standard deviation is a single scalar. This will scale the data between [-1,1].
 
         :param signal_data: signal data to be normalised (shape: [s,n,m])
         :return: normalised signal of size (shape: [s,n,m])

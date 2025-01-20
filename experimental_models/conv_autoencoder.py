@@ -5,6 +5,9 @@ import numpy as np
 import torch
 
 from matplotlib import pyplot as plt
+from sklearn.metrics import silhouette_score
+from torch.nn import MSELoss
+from tslearn.metrics import SoftDTWLossPyTorch
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
@@ -37,6 +40,10 @@ class _ConvAutoEncoderModel(nn.Module):
         encoder_layers.append(nn.Linear(self.current_length*n_layers[-1], latent_dim))
         encoder_layers.append(nn.LeakyReLU())
 
+        # adding mean and log variance layers for kl divergence
+        self.z_mean = nn.Linear(latent_dim, latent_dim)
+        self.z_log_var = nn.Linear(latent_dim, latent_dim)
+
         # conv decoder
         reversed_layers = n_layers[::-1]
         decoder_layers = [
@@ -54,16 +61,22 @@ class _ConvAutoEncoderModel(nn.Module):
         self.decoder = nn.Sequential(*decoder_layers)
 
     def forward(self, x):
-        encoded = self.encoder(x)
-        linear = self.linear_decoder(encoded)
+        # encode the data
+        latent = self.encoder(x)
+
+        # convert the flattened latent space back into 2d space
+        linear = self.linear_decoder(latent)
         linear_reshaped = linear.view(linear.size(0), self.n_layers[-1], self.current_length)
+
+        # decode
         decoded = self.decoder(linear_reshaped)
-        return encoded, decoded
+
+        return latent, decoded
 
 
 class ConvAutoencoder(_ConvAutoEncoderModel):
-    def __init__(self, n_layers, input_shape, uuid, logger, loader, epochs, figures_path):
-        super().__init__(n_layers=n_layers, input_shape=input_shape)
+    def __init__(self, n_layers, input_shape, uuid, logger, loader, epochs, figures_path, latent_dim):
+        super().__init__(n_layers=n_layers, input_shape=input_shape, latent_dim=latent_dim)
 
         self.uuid = uuid
         self.logger = logger
@@ -81,34 +94,33 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
             self.logger.info("No GPU available. Training will run on CPU.")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
     def train_autoencoder(self):
         self.train()
         self.to(self.device)
 
-        recon_loss_fn = nn.MSELoss()
+        loss_fn = MSELoss()
         total_losses = []
         best_loss = (np.inf, 0)
 
         tqdm_loop = tqdm(range(self.epochs), desc="Training Convolutional Autoencoder", unit="epoch")
         for epoch in tqdm_loop:
             losses = []
-            for x_data, y_labels in self.loader:
+            for x_data, y_true in self.loader:
                 self.zero_grad()
 
-                # padding the tensor if needed
+                # padding the tensor if needed (batch_size > x_data.shape[0])
                 pad_size = self.loader.batch_size - x_data.shape[0]
                 x_data = nn.functional.pad(x_data, (0, 0, 0, 0, 0, pad_size))
 
                 x_data = x_data.to(self.device)
-                latent, reconstructed = self(x_data)
+                latent_space, reconstructed = self(x_data)
 
                 # the reconstructed data must be the same size, pad it
                 reconstructed = nn.functional.pad(reconstructed, (0, 1))
-                reconstruction_loss = recon_loss_fn(reconstructed, x_data)
+                loss = loss_fn(reconstructed, x_data)
 
-                losses.append(reconstruction_loss.item())
-                reconstruction_loss.backward()
+                losses.append(loss.item())
+                loss.backward()
 
                 self.optimiser.step()
 

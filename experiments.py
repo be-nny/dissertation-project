@@ -1,4 +1,10 @@
 import os
+from cProfile import label
+
+import pandas as pd
+from tqdm import tqdm
+from typer.rich_utils import print_with_rich
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 import argparse
@@ -22,11 +28,20 @@ from model import utils
 matplotlib.use('TkAgg')
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
+parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS',
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-e", "--experiment", type=str, help="Experiment to run")
+parser.add_argument("-e1", "--experiment_1", action="store_true", help="Run Experiment 1")
+parser.add_argument("-e2", "--experiment_2", type=int, help="Run Experiment 2")
+parser.add_argument("-e3", "--experiment_3", help="Run Experiment 3")
+parser.add_argument("-e4", "--experiment_4",  action="store_true", help="Run Experiment 4")
+
+
+BATCH_SIZE = 512
+
 
 def show_info(logger, config):
     datasets = os.listdir(config.OUTPUT_PATH)
@@ -34,293 +49,186 @@ def show_info(logger, config):
     for uuid in datasets:
         if uuid[0] != "." and uuid != "experiments":
             path = os.path.join(config.OUTPUT_PATH, uuid)
-            with open(os.path.join(path, "receipt.json"), "r") as f:
-                data = json.load(f)
-
-                signal_processor = data['preprocessor_info']['signal_processor']
-                seg_dur = data['preprocessor_info']['segment_duration']
-                total_samples = data['preprocessor_info']['total_samples']
-                created_time = data['start_time']
-
-            out_str = f"{uuid} - {signal_processor:<15} SAMPLE SIZE: {total_samples:<5} SEGMENT DURATION:{seg_dur:<5} CREATED:{created_time:<10}"
+            receipt_file = os.path.join(path, "receipt.json")
+            with utils.ReceiptReader(filename=receipt_file) as receipt_reader:
+                out_str = f"{uuid} - {receipt_reader.signal_processor:<15} SAMPLE SIZE: {receipt_reader.total_samples:<5} SEGMENT DURATION:{receipt_reader.seg_dur:<5} CREATED:{receipt_reader.created_time:<10}"
 
             logger.info(out_str)
 
 def cluster_info(latent_space, y_true, logger, n_clusters: int = 10):
+    """
+    With the provided latent space and true y values, the latent space is clustered using:
+
+    - kmeans
+    - GMM
+    - DBSCAN
+
+    The NMI score for each clustering output is computed alongside the Silhouette score of the latent space.
+
+    :param latent_space: latent space to cluster
+    :param y_true: true labels
+    :param logger: logger
+    :param n_clusters: number of clusters
+    :return: kmeans_nmi, gm_nmi, db_scan_nmi, s
+    """
+
     # run kmeans
     kmeans = KMeans(n_clusters=n_clusters)
     y_pred = kmeans.fit_predict(latent_space)
-
-    nmi = normalized_mutual_info_score(y_true, y_pred)
-    logger.info(f"KMEANS - NMI: {nmi}")
+    kmeans_nmi = normalized_mutual_info_score(y_true, y_pred)
 
     # run dbscan
-    db_scan = DBSCAN(min_samples=2)
+    db_scan = DBSCAN()
     y_pred = db_scan.fit_predict(latent_space)
-
-    nmi = normalized_mutual_info_score(y_true, y_pred)
-    logger.info(f"DBSCAN - NMI: {nmi}")
+    db_scan_nmi = normalized_mutual_info_score(y_true, y_pred)
 
     # gaussian model
     gm = GaussianMixture(n_components=10)
     y_pred = gm.fit_predict(latent_space)
-
-    nmi = normalized_mutual_info_score(y_true, y_pred)
-    logger.info(f"Gaussian Mixture - NMI: {nmi}")
+    gm_nmi = normalized_mutual_info_score(y_true, y_pred)
 
     # silhouette score
     s = silhouette_score(latent_space, y_true)
-    logger.info(f"Silhouette Score: {s}")
 
-def visualise_3D(latent_space, y_true, path):
+    return kmeans_nmi, gm_nmi, db_scan_nmi, s
+
+def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
+    unique_labels = np.unique(y_true)
+    str_labels = loader.decode_label(unique_labels)
+
     fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111)
     scatter = ax.scatter(
-        latent_space[:, 0], latent_space[:, 1], latent_space[:, 2],
-        c=y_true, cmap='viridis', alpha=0.7, s=10
+        latent_space[:, 0], latent_space[:, 1], c=y_true, cmap='tab10', alpha=0.7, s=10
     )
 
-    plt.colorbar(scatter, ax=ax, label="Cluster Labels")
-    ax.set_title("3D Visualisation of Latent Space")
+    colour_bar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
+    colour_bar.set_ticks(unique_labels)
+    colour_bar.set_ticklabels(str_labels)
+
+    if genre_filter == "":
+        genre_filter = "all genres"
+
+    ax.set_title(f"2D Visualisation of Latent Space (genres: {genre_filter})")
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
-    ax.set_zlabel("Axis 3")
     plt.savefig(path)
-    plt.show()
+    logger.info(f"Saved plot '{path}'")
 
-def experiment_5(config, logger, args, experiment_path):
-    # load the data
-    batch_size = 512
-    epochs = 1000
-    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
-    batch_loader = loader.load(split_type="train", normalise=True)
-    conv_ae = conv_autoencoder.ConvAutoencoder(
-        loader=batch_loader,
-        logger=logger,
-        uuid=args.uuid,
-        figures_path=experiment_path,
-        epochs=epochs,
-        n_layers=[loader.input_shape[0], loader.input_shape[0]*2, loader.input_shape[0]*3],
-        input_shape = loader.input_shape,
-    )
+def plot_2d_kmeans(latent_space, kmeans, logger, path, genre_filter, y_true, loader, h: float = 0.02):
+    # plot the decision boundary
+    x_min, x_max = latent_space[:, 0].min() - 1, latent_space[:, 0].max() + 1
+    y_min, y_max = latent_space[:, 1].min() - 1, latent_space[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
 
-    conv_ae.train_autoencoder()
+    # obtain labels for each point in mesh. Use last trained model.
+    Z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
+    unique_labels = np.unique(Z)
+    str_labels = loader.decode_label(unique_labels)
 
-def experiment_4(config, logger, args, experiment_path):
-    # load the data
-    batch_size = 512
-    umap_components = 64
-    latent_dims = 3
+    # Put the result into a color plot
+    Z = Z.reshape(xx.shape)
+    plt.figure(1)
+    plt.clf()
+    img = plt.imshow(Z, interpolation="nearest", extent=(xx.min(), xx.max(), yy.min(), yy.max()), cmap=plt.cm.Paired, aspect="auto", origin="lower")
+    colour_bar = plt.colorbar(img)
 
-    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
-    train_data = []
-    train_labels = []
-    for x, y in loader.load(split_type="train", normalise=True):
-        for val in x:
-            train_data.append(val.detach().cpu().numpy())
-        train_labels.extend(y)
-    train_data = np.array(train_data)
-    train_data = train_data.reshape(train_data.shape[0], -1)
-    train_labels = np.array(train_labels)
+    colour_bar.set_ticks(np.arange(len(unique_labels)))
+    colour_bar.set_ticklabels(str_labels)
 
-    # run UMAP on input signals
-    mapper = umap.UMAP(min_dist=0.0, spread=3, n_components=umap_components, n_neighbors=15, local_connectivity=3)
-    train_umap_space = mapper.fit_transform(train_data)
+    plt.plot(latent_space[:, 0], latent_space[:, 1], "k.", markersize=2)
 
-    # create torch dataset loader
-    data_tensor = torch.tensor(np.array(train_umap_space), dtype=torch.float32)
-    labels_tensor = torch.tensor(np.array(train_labels), dtype=torch.int64)
-    tensor_dataset = TensorDataset(data_tensor, labels_tensor)
-    train_data_loader = DataLoader(tensor_dataset, batch_size=batch_size)
+    # plot the centroids as a white X
+    centroids = kmeans.cluster_centers_
+    plt.scatter(centroids[:, 0], centroids[:, 1], marker="x", s=169, linewidths=3, color="w", zorder=10)
+    plt.title(f"K-means clustering after PCA (genres: {genre_filter})")
+    plt.xlim(x_min, x_max)
+    plt.ylim(y_min, y_max)
+    plt.xticks(())
+    plt.yticks(())
+    plt.savefig(path)
+    logger.info(f"Saved plot '{path}'")
 
-    # parsing this into an autoencoder
-    hidden_layers = [umap_components, 512, 256, 16, latent_dims]
-    sae = stacked_autoencoder.SAE(
-        hidden_layers=hidden_layers,
-        logger=logger,
-        loader=train_data_loader,
-        uuid=args.uuid,
-        epochs=1000,
-        dropout_rate=0.2,
-        figures_path=experiment_path,
-    )
-    sae.train_autoencoder()
+def plot_eigenvalues(path, pca_model: pca.PCA, logger):
+    plt.plot([i for i in range(1, pca_model.n_components + 1)], pca_model.explained_variance_, marker="o", linestyle="-",label="Eigenvalues")
+    plt.xlabel("Number of Components")
+    plt.ylabel("Eigenvalues (log)")
+    plt.yscale("log")
 
-    # visuals the embeddings
-    # load the test data
-    test_data = []
-    test_labels = []
-    for x, y in loader.load(split_type="test", normalise=True):
-        for val in x:
-            test_data.append(val.detach().cpu().numpy())
-        test_labels.extend(y)
-    test_data = np.array(test_data)
-    test_data = test_data.reshape(test_data.shape[0], -1)
-    test_labels = np.array(test_labels)
+    plt.title("PCA Eigenvalues (log scale)")
+    plt.savefig(path)
+    plt.close()
+    logger.info(f"Saved plot '{path}'")
 
-    # use the mapper to map it using UMAP
-    test_umap_space = mapper.fit_transform(test_data)
 
-    # create the data loaders
-    data_tensor = torch.tensor(np.array(test_umap_space), dtype=torch.float32)
-    labels_tensor = torch.tensor(np.array(test_labels), dtype=torch.int64)
-    tensor_dataset = TensorDataset(data_tensor, labels_tensor)
-    test_data_loader = DataLoader(tensor_dataset, batch_size=batch_size)
-
-    # fit this new data
-    latent_space = []
-    train_labels = []
-    sae.eval()
-    for x, y in test_data_loader:
-        x = x.to(sae.device)
-        l, _ = sae(x)
-        latent_space.extend(l.detach().cpu().numpy())
-        train_labels.extend(y)
-
-    latent_space = np.array(latent_space)
-
-    # cluster
-    cluster_info(y_true=train_labels, logger=logger, n_clusters=10, latent_space=latent_space)
-
-    # plot results
-    path = os.path.join(experiment_path, f"{args.uuid}_umap_sae_visualisation.pdf")
-    visualise_3D(latent_space, train_labels, path)
-
-def experiment_3(config, logger, args, experiment_path):
-    # load the data
-    batch_size = 512
-    latent_dims = 3
-
-    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
-    data = []
-    y_true = []
-    for x, y in loader.load(split_type="all", normalise=True):
-        for val in x:
-            data.append(val.detach().cpu().numpy())
-        y_true.extend(y)
-    data = np.array(data)
-    reshaped_data = data.reshape(data.shape[0], -1)
-    y_true = np.array(y_true)
-
-    # run UMAP on input signals
-    latent_space = umap.UMAP(min_dist=0.0, spread=3, n_components=latent_dims, n_neighbors=15, local_connectivity=3).fit_transform(reshaped_data)
-
-    # cluster scores
-    cluster_info(y_true=y_true, logger=logger, n_clusters=10, latent_space=latent_space)
-
-    # plot results
-    path = os.path.join(experiment_path, f"{args.uuid}_umap_visualisation.pdf")
-    visualise_3D(latent_space, y_true, path)
-
-def experiment_2(config, logger, args, experiment_path):
-    batch_size = 512
-    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
-
-    # creating pca model
-    pca_components = 32
-    latent_dims = 3
-    pca_model = pca.PCAModel(logger=logger, output_path=experiment_path,
-                             n_components=pca_components, uuid=args.uuid)
-    data = []
-    labels = []
-
-    for x, y in loader.load(split_type="train", normalise=True):
-        x = x.numpy()
-        flattened = [i.flatten() for i in x]
-        data.extend(flattened)
-        labels.extend(y)
-
-    x_reduced = pca_model.fit_transform(data)
-    pca_model.plot_eigenvalues()
-
-    # create torch dataset loader
-    data_tensor = torch.tensor(np.array(x_reduced), dtype=torch.float32)
-    labels_tensor = torch.tensor(np.array(labels), dtype=torch.int64)
-    reduced_dataset = TensorDataset(data_tensor, labels_tensor)
-    reduced_loader = DataLoader(reduced_dataset, batch_size=batch_size)
-
-    # parsing this into an autoencoder
-    hidden_layers = [pca_components, 2048, 1024, 128, latent_dims]
-    sae = stacked_autoencoder.SAE(
-        hidden_layers=hidden_layers,
-        logger=logger,
-        loader=reduced_loader,
-        epochs=1000,
-        dropout_rate=0.1,
-        uuid=args.uuid,
-        figures_path=experiment_path,
-    )
-    sae.train_autoencoder()
-
-    # visuals the embeddings
-    # load the test data
-    test_data = []
-    test_labels = []
-    for x, y in loader.load(split_type="test", normalise=True):
-        for val in x:
-            test_data.append(val.detach().cpu().numpy())
-        test_labels.extend(y)
-    test_data = np.array(test_data)
-    test_data = test_data.reshape(test_data.shape[0], -1)
-    test_labels = np.array(test_labels)
-
-    # use the mapper to map it using UMAP
-    test_umap_space = pca_model.fit_transform(test_data)
-
-    # create the data loaders
-    data_tensor = torch.tensor(np.array(test_umap_space), dtype=torch.float32)
-    labels_tensor = torch.tensor(np.array(test_labels), dtype=torch.int64)
-    tensor_dataset = TensorDataset(data_tensor, labels_tensor)
-    test_data_loader = DataLoader(tensor_dataset, batch_size=batch_size)
-
-    # fit this new data
-    latent_space = []
-    train_labels = []
-    sae.eval()
-    for x, y in test_data_loader:
-        x = x.to(sae.device)
-        l, _ = sae(x)
-        latent_space.extend(l.detach().cpu().numpy())
-        train_labels.extend(y)
-
-    latent_space = np.array(latent_space)
-
-    # cluster
-    cluster_info(y_true=train_labels, logger=logger, n_clusters=10, latent_space=latent_space)
-
-    # plot results
-    path = os.path.join(experiment_path, f"{args.uuid}_pca_sae_visualisation.pdf")
-    visualise_3D(latent_space, train_labels, path)
-
-def experiment_1(config, logger, args, experiment_path):
-    batch_size = 512
-    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=batch_size)
-
-    # creating pca model
-    pca_components = 32
-    pca_model = pca.PCAModel(logger=logger, output_path=experiment_path, n_components=pca_components, uuid=args.uuid)
+def analyse_latent_dims(dim_reducer: pca.PCA | umap.UMAP, loader, logger, path, title, n_clusters=10, max_components=100):
     data = []
     y_true = []
 
-    for x, y in loader.load(split_type="all", normalise=False):
+    kmeans_nmi_metrics = []
+    gm_nmi_metrics = []
+    db_scan_nmi_metrics = []
+
+    best_kmeans = 0
+    best_gm = 0
+    best_db = 0
+
+    best_kmeans_comp = 0
+    best_gm_comp = 0
+    best_db_comp = 0
+
+    x_components = [n for n in range(2, max_components + 1)]
+    batch_loader = loader.load(split_type="all", normalise=True)
+
+    for x, y in batch_loader:
         x = x.numpy()
         flattened = [i.flatten() for i in x]
         data.extend(flattened)
         y_true.extend(y)
 
-    latent_space = pca_model.fit_transform(data)
-    pca_model.plot_eigenvalues()
+    for n in tqdm(range(2, max_components + 1), desc="Computing latent dimensions"):
+        dim_reducer.n_components = n
+        latent_space = dim_reducer.fit_transform(data)
+        kmeans_nmi, gm_nmi, db_scan_nmi, _ = cluster_info(latent_space, y_true, logger, n_clusters)
+        if kmeans_nmi > best_kmeans:
+            best_kmeans = kmeans_nmi
+            best_kmeans_comp = n
 
-    # cluster
-    cluster_info(y_true=y_true, logger=logger, n_clusters=10, latent_space=latent_space)
+        if gm_nmi > best_gm:
+            best_gm = gm_nmi
+            best_gm_comp = n
 
-    # plot results
-    path = os.path.join(experiment_path, f"{args.uuid}_pca_visualisation.pdf")
-    visualise_3D(latent_space, y_true, path)
+        if db_scan_nmi > best_db:
+            best_db = db_scan_nmi
+            best_db_comp = n
+
+        kmeans_nmi_metrics.append(kmeans_nmi)
+        gm_nmi_metrics.append(gm_nmi)
+        db_scan_nmi_metrics.append(db_scan_nmi)
+
+    plt.figure(figsize=(8, 8))
+    plt.title(title)
+    plt.xlabel("Latent Dimensions")
+    plt.ylabel("Normalised Mutual Information Score")
+    plt.plot(x_components, kmeans_nmi_metrics, color="blue", label="Kmeans NMI Scores", alpha=0.7)
+    plt.plot(x_components, gm_nmi_metrics, color="red", label="GMM NMI Scores", alpha=0.7)
+    plt.plot(x_components, db_scan_nmi_metrics, color="green", label="DB-SCAN NMI Scores", alpha=0.7)
+
+    plt.plot(best_kmeans_comp, best_kmeans, "o", color="pink", label=f"Best KMeans Latent Size: '{best_kmeans_comp}' - {round(best_kmeans, 3)}")
+    plt.plot(best_gm_comp, best_gm, "o", color="pink", label=f"Best GMM Latent Size: '{best_gm_comp}' - {round(best_gm, 3)}")
+    plt.plot(best_db_comp, best_db, "o", color="pink", label=f"Best DB-SCAN Latent Size: '{best_db_comp}' - {round(best_db, 3)}")
+
+    plt.legend()
+    plt.savefig(path)
+    plt.close()
+
+    logger.info(f"Saved plot '{path}'")
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
 
+    metrics = {}
     config = config.Config(path=args.config)
     logger = logger.get_logger()
 
@@ -332,40 +240,79 @@ if __name__ == "__main__":
         show_info(logger, config)
 
     if args.uuid:
-        experiments = [int(i) for i in args.experiment.split(",")]
-        if 1 in experiments:
-            exp_1_path = os.path.join(experiments_dir, "experiment_1")
-            if not os.path.exists(exp_1_path):
-                os.mkdir(exp_1_path)
+        uuid_dir = os.path.join(config.OUTPUT_PATH, args.uuid)
+        with utils.ReceiptReader(filename=os.path.join(uuid_dir, "receipt.json")) as receipt_reader:
+            signal_processor = receipt_reader.signal_processor
 
-            logger.info("Running Experiment 1")
-            experiment_1(config, logger, args, exp_1_path)
-        if 2 in experiments:
-            exp_2_path = os.path.join(experiments_dir, "experiment_2")
-            if not os.path.exists(exp_2_path):
-                os.mkdir(exp_2_path)
+        if args.experiment_1:
+            # analyses the NMI scores against the latent space size
+            # this plots these results on two separate graphs
+            # run this with different preprocessed datasets
 
-            logger.info("Running Experiment 2")
-            experiment_2(config, logger, args, exp_2_path)
-        if 3 in experiments:
-            exp_3_path = os.path.join(experiments_dir, "experiment_3")
-            if not os.path.exists(exp_3_path):
-                os.mkdir(exp_3_path)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
 
-            logger.info("Running Experiment 3")
-            experiment_3(config, logger, args, exp_3_path)
-        if 4 in experiments:
-            exp_4_path = os.path.join(experiments_dir, "experiment_4")
-            if not os.path.exists(exp_4_path):
-                os.mkdir(exp_4_path)
+            pca_model = pca.PCA()
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_pca_latent_dims_analysis.pdf")
+            logger.info("Latent space analysis for PCA")
+            analyse_latent_dims(dim_reducer=pca_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for PCA")
 
-            logger.info("Running Experiment 4")
-            experiment_4(config, logger, args, exp_4_path)
+            # umap_model = umap.UMAP()
+            # path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_umap_latent_dims_analysis.pdf")
+            # logger.info("Latent space analysis for UMAP")
+            # analyse_latent_dims(dim_reducer=umap_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for UMAP")
 
-        if 5 in experiments:
-            exp_5_path = os.path.join(experiments_dir, "experiment_5")
-            if not os.path.exists(exp_5_path):
-                os.mkdir(exp_5_path)
+        if args.experiment_2:
+            # plots an eigenvalue plot obtained after performing pca with n_components
+            # takes a flag for the number of components pca should use
+            # run this with different preprocessed datasets
 
-            logger.info("Running Experiment 5")
-            experiment_5(config, logger, args, exp_5_path)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+
+            pca_model = pca.PCA(n_components=args.experiment_2)
+            data = []
+            batch_loader = loader.load(split_type="all", normalise=True)
+            print(loader.input_shape)
+            for x, y in batch_loader:
+                x = x.numpy()
+                flattened = [i.flatten() for i in x]
+                data.extend(flattened)
+
+            pca_model.fit(data)
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_eigenvalues.pdf")
+            plot_eigenvalues(path=path, pca_model=pca_model, logger=logger)
+
+        if args.experiment_3:
+            # takes a flag for the types of genres to filter to flag can be set to all to allow all genres
+            # uses kmeans to produce 2 plots:
+            # 1. being a kmeans visualisation with kmeans boundaries
+            # 2. a standard latent space visualisation
+
+            if args.experiment_3 != "all":
+                genre_filter = args.experiment_3.replace(" ", "").split(",")
+                n_clusters = len(genre_filter)
+            else:
+                genre_filter = []
+                n_clusters = 10
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+
+            data = []
+            y_true = []
+            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+
+            for x, y in batch_loader:
+                x = x.numpy()
+                flattened = [i.flatten() for i in x]
+                data.extend(flattened)
+                y_true.extend(y)
+
+            pca_model = pca.PCA(n_components=2)
+            pca_latent = pca_model.fit_transform(data)
+
+            kmeans = KMeans(n_clusters=n_clusters)
+            kmeans.fit(pca_latent)
+
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.experiment_3}_pca_kmeans_plot.pdf")
+            plot_2d_kmeans(kmeans=kmeans, latent_space=pca_latent, y_true=y_true, logger=logger, path=path, genre_filter=args.experiment_3, loader=loader)
+
+            path = os.path.join(experiments_dir,f"{args.uuid}_{signal_processor}_{args.experiment_3}_pca_latent_space.pdf")
+            plot_2D(latent_space=pca_latent, y_true=y_true, logger=logger, path=path, genre_filter=args.experiment_3, loader=loader)
