@@ -1,6 +1,4 @@
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-
 import argparse
 import os.path
 import numpy as np
@@ -13,20 +11,23 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
-from sklearn.metrics import normalized_mutual_info_score, silhouette_score
+from sklearn.metrics import normalized_mutual_info_score
 from sklearn.mixture import GaussianMixture
 from model import utils
 
 matplotlib.use('TkAgg')
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
+parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS',
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
 parser.add_argument("-n", "--nmi", type=str, help="Plots NMI score against the number of UMAP or PCA components. Set flag to 'pca' or 'umap'")
 parser.add_argument("-e", "--eigen", type=int, help="Plots the eigenvalues obtained after performing PCA. Takes value for max n_components")
-parser.add_argument("-b", "--boundaries", help="Plots 2D Kmeans Boundaires of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
+parser.add_argument("-b", "--boundaries", help="Plots 2D Kmeans Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
 parser.add_argument("-t", "--inertia", help="Plots number of clusters against kmeans inertia score for UMAP or PCA. '-g' must also be set. '-nc' must be set for the max. number of clusters")
 parser.add_argument("-v2", "--visualise2d", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
 parser.add_argument("-v3", "--visualise3d", help="Plots 3D Latent Space of UMAP or PCA. '-g' must also be set.")
@@ -34,6 +35,7 @@ parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to all, all genres are used")
 
 BATCH_SIZE = 512
+
 
 def show_info(logger, config):
     datasets = os.listdir(config.OUTPUT_PATH)
@@ -46,6 +48,7 @@ def show_info(logger, config):
                 out_str = f"{uuid} - {receipt_reader.signal_processor:<15} SAMPLE SIZE: {receipt_reader.total_samples:<5} SEGMENT DURATION:{receipt_reader.seg_dur:<5} CREATED:{receipt_reader.created_time:<10}"
 
             logger.info(out_str)
+
 
 def nmi_scores(latent_space, y_true, n_clusters: int = 10):
     """
@@ -80,6 +83,7 @@ def nmi_scores(latent_space, y_true, n_clusters: int = 10):
 
     return kmeans_nmi, gm_nmi, db_scan_nmi
 
+
 def plot_3D(latent_space, y_true, path, logger, genre_filter, loader):
     unique_labels = np.unique(y_true)
     str_labels = loader.decode_label(unique_labels)
@@ -102,6 +106,7 @@ def plot_3D(latent_space, y_true, path, logger, genre_filter, loader):
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
+
 def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
     unique_labels = np.unique(y_true)
     str_labels = loader.decode_label(unique_labels)
@@ -120,6 +125,7 @@ def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
 
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
+
 
 def plot_2d_kmeans_boundaries(latent_space, kmeans, logger, path, genre_filter, y_true, h: float = 0.02):
     # plot the decision boundary
@@ -148,8 +154,9 @@ def plot_2d_kmeans_boundaries(latent_space, kmeans, logger, path, genre_filter, 
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
+
 def plot_eigenvalues(path, pca_model: PCA, logger):
-    plt.plot([i for i in range(1, pca_model.n_components + 1)], pca_model.explained_variance_, marker="o", linestyle="-",label="Eigenvalues")
+    plt.plot([i for i in range(1, pca_model.n_components + 1)], pca_model.explained_variance_, marker="o", linestyle="-", label="Eigenvalues")
     plt.xlabel("Number of Components")
     plt.ylabel("Eigenvalues (log)")
     plt.yscale("log")
@@ -158,6 +165,7 @@ def plot_eigenvalues(path, pca_model: PCA, logger):
     plt.savefig(path)
     plt.close()
     logger.info(f"Saved plot '{path}'")
+
 
 def analyse_kmeans(latent_space, logger, max_clusters=20, n_genres=10):
     inertia = []
@@ -174,6 +182,7 @@ def analyse_kmeans(latent_space, logger, max_clusters=20, n_genres=10):
     plt.title("KMeans Inertia against Number of Clusters")
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
+
 
 def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, title, n_clusters=10, max_components=100):
     data = []
@@ -228,15 +237,26 @@ def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, titl
     plt.plot(x_components, gm_nmi_metrics, color="red", label="GMM NMI Scores", alpha=0.7)
     plt.plot(x_components, db_scan_nmi_metrics, color="green", label="DB-SCAN NMI Scores", alpha=0.7)
 
-    plt.plot(best_kmeans_comp, best_kmeans, "o", color="pink", label=f"Best KMeans Latent Size: '{best_kmeans_comp}' - {round(best_kmeans, 3)}")
-    plt.plot(best_gm_comp, best_gm, "o", color="pink", label=f"Best GMM Latent Size: '{best_gm_comp}' - {round(best_gm, 3)}")
-    plt.plot(best_db_comp, best_db, "o", color="pink", label=f"Best DB-SCAN Latent Size: '{best_db_comp}' - {round(best_db, 3)}")
+    plt.plot(best_kmeans_comp, best_kmeans, "o", color="pink",label=f"Best KMeans Latent Size: '{best_kmeans_comp}' - {round(best_kmeans, 3)}")
+    plt.plot(best_gm_comp, best_gm, "o", color="pink",label=f"Best GMM Latent Size: '{best_gm_comp}' - {round(best_gm, 3)}")
+    plt.plot(best_db_comp, best_db, "o", color="pink",label=f"Best DB-SCAN Latent Size: '{best_db_comp}' - {round(best_db, 3)}")
 
     plt.legend()
     plt.savefig(path)
     plt.close()
 
     logger.info(f"Saved plot '{path}'")
+
+def load_flatten(batch_loader):
+    data = []
+    y_true = []
+    for x, y in batch_loader:
+        x = x.numpy()
+        flattened = [i.flatten() for i in x]
+        data.extend(flattened)
+        y_true.extend(y)
+
+    return data, y_true
 
 def get_dim_model(model_type):
     if model_type.lower() == "pca":
@@ -292,16 +312,10 @@ if __name__ == "__main__":
             # run this with different preprocessed datasets
 
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-
             pca_model = PCA(n_components=args.eigen)
-            data = []
-            batch_loader = loader.load(split_type="all", normalise=True)
-            print(loader.input_shape)
-            for x, y in batch_loader:
-                x = x.numpy()
-                flattened = [i.flatten() for i in x]
-                data.extend(flattened)
 
+            batch_loader = loader.load(split_type="all", normalise=True)
+            data, y_true = load_flatten(batch_loader)
             pca_model.fit(data)
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_eigenvalues.pdf")
             plot_eigenvalues(path=path, pca_model=pca_model, logger=logger)
@@ -309,20 +323,11 @@ if __name__ == "__main__":
         if args.boundaries:
             # use pca or umap
             # uses kmeans to produce kmeans boundaries plot
-
             _, genre_filter = get_genre_filter(args.genres)
-
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
             batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
-            data = []
-            y_true = []
-            for x, y in batch_loader:
-                x = x.numpy()
-                flattened = [i.flatten() for i in x]
-                data.extend(flattened)
-                y_true.extend(y)
-
+            data, y_true = load_flatten(batch_loader)
             dim_model = get_dim_model(args.boundaires)
 
             latent = dim_model.fit_transform(data)
@@ -333,18 +338,11 @@ if __name__ == "__main__":
             plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres)
 
         if args.inertia:
-            data = []
-            y_true = []
             n_genres, genre_filter = get_genre_filter(args.genres)
 
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
             batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
-            for x, y in batch_loader:
-                x = x.numpy()
-                flattened = [i.flatten() for i in x]
-                data.extend(flattened)
-                y_true.extend(y)
-
+            data, y_true = load_flatten(batch_loader)
             dim_model = get_dim_model(args.inertia)
 
             latent_space = dim_model.fit_transform(data)
@@ -359,14 +357,7 @@ if __name__ == "__main__":
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
             batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
-            data = []
-            y_true = []
-            for x, y in batch_loader:
-                x = x.numpy()
-                flattened = [i.flatten() for i in x]
-                data.extend(flattened)
-                y_true.extend(y)
-
+            data, y_true = load_flatten(batch_loader)
             dim_model = get_dim_model(args.visualise2d)
             latent = dim_model.fit_transform(data)
 
@@ -380,15 +371,9 @@ if __name__ == "__main__":
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
             batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
-            data = []
-            y_true = []
-            for x, y in batch_loader:
-                x = x.numpy()
-                flattened = [i.flatten() for i in x]
-                data.extend(flattened)
-                y_true.extend(y)
-
+            data, y_true = load_flatten(batch_loader)
             dim_model = get_dim_model(args.visualise3d)
+
             dim_model.n_components = 3
             latent = dim_model.fit_transform(data)
 
