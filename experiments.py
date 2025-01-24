@@ -1,46 +1,39 @@
 import os
-from sklearn.decomposition import PCA
-
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-from tqdm import tqdm
-
-
 import argparse
-import json
 import os.path
 import numpy as np
-import torch
 import umap.umap_ as umap
 import matplotlib
 import config
 import logger
 
+from sklearn.decomposition import PCA
+from tqdm import tqdm
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import normalized_mutual_info_score, silhouette_score
 from sklearn.mixture import GaussianMixture
-from torch.utils.data import TensorDataset, DataLoader
-from experimental_models import stacked_autoencoder, conv_autoencoder
 from model import utils
 
 matplotlib.use('TkAgg')
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS',
-                                 formatter_class=argparse.RawDescriptionHelpFormatter,
-                                 description="Preprocess Audio Dataset")
+parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-e1", "--experiment_1", action="store_true", help="Run Experiment 1")
-parser.add_argument("-e2", "--experiment_2", type=int, help="Run Experiment 2")
-parser.add_argument("-e3", "--experiment_3", help="Run Experiment 3")
-parser.add_argument("-e4", "--experiment_4",  action="store_true", help="Run Experiment 4")
-
+parser.add_argument("-n", "--nmi", type=str, help="Plots NMI score against the number of UMAP or PCA components. Set flag to 'pca' or 'umap'")
+parser.add_argument("-e", "--eigen", type=int, help="Plots the eigenvalues obtained after performing PCA. Takes value for max n_components")
+parser.add_argument("-b", "--boundaries", help="Plots 2D Kmeans Boundaires of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
+parser.add_argument("-t", "--inertia", help="Plots number of clusters against kmeans inertia score for UMAP or PCA. '-g' must also be set. '-nc' must be set for the max. number of clusters")
+parser.add_argument("-v2", "--visualise2d", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
+parser.add_argument("-v3", "--visualise3d", help="Plots 3D Latent Space of UMAP or PCA. '-g' must also be set.")
+parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters")
+parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to all, all genres are used")
 
 BATCH_SIZE = 512
-
 
 def show_info(logger, config):
     datasets = os.listdir(config.OUTPUT_PATH)
@@ -54,7 +47,7 @@ def show_info(logger, config):
 
             logger.info(out_str)
 
-def cluster_info(latent_space, y_true, logger, n_clusters: int = 10):
+def nmi_scores(latent_space, y_true, n_clusters: int = 10):
     """
     With the provided latent space and true y values, the latent space is clustered using:
 
@@ -62,13 +55,12 @@ def cluster_info(latent_space, y_true, logger, n_clusters: int = 10):
     - GMM
     - DBSCAN
 
-    The NMI score for each clustering output is computed alongside the Silhouette score of the latent space.
+    The NMI score for each clustering output is computed.
 
     :param latent_space: latent space to cluster
     :param y_true: true labels
-    :param logger: logger
     :param n_clusters: number of clusters
-    :return: kmeans_nmi, gm_nmi, db_scan_nmi, s
+    :return: kmeans_nmi, gm_nmi, db_scan_nmi
     """
 
     # run kmeans
@@ -86,10 +78,29 @@ def cluster_info(latent_space, y_true, logger, n_clusters: int = 10):
     y_pred = gm.fit_predict(latent_space)
     gm_nmi = normalized_mutual_info_score(y_true, y_pred)
 
-    # silhouette score
-    s = silhouette_score(latent_space, y_true)
+    return kmeans_nmi, gm_nmi, db_scan_nmi
 
-    return kmeans_nmi, gm_nmi, db_scan_nmi, s
+def plot_3D(latent_space, y_true, path, logger, genre_filter, loader):
+    unique_labels = np.unique(y_true)
+    str_labels = loader.decode_label(unique_labels)
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    scatter = ax.scatter(latent_space[:, 0], latent_space[:, 1], latent_space[:, 2], c=y_true, cmap='tab10', alpha=0.7, s=10)
+    colour_bar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
+    colour_bar.set_ticks(unique_labels)
+    colour_bar.set_ticklabels(str_labels)
+
+    ax.set_title(f"3D Visualisation of Latent Space (genres: {genre_filter})")
+    ax.set_xlabel("Axis 1")
+    ax.set_ylabel("Axis 2")
+    ax.set_zlabel("Axis 3")
+
+    ax.grid(False)
+    plt.show()
+
+    plt.savefig(path)
+    logger.info(f"Saved plot '{path}'")
 
 def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
     unique_labels = np.unique(y_true)
@@ -97,24 +108,20 @@ def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
 
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111)
-    scatter = ax.scatter(
-        latent_space[:, 0], latent_space[:, 1], c=y_true, cmap='tab10', alpha=0.7, s=10
-    )
-
+    scatter = ax.scatter(latent_space[:, 0], latent_space[:, 1], c=y_true, cmap='tab10', alpha=0.7, s=10)
     colour_bar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
     colour_bar.set_ticks(unique_labels)
     colour_bar.set_ticklabels(str_labels)
 
-    if genre_filter == "":
-        genre_filter = "all genres"
-
     ax.set_title(f"2D Visualisation of Latent Space (genres: {genre_filter})")
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
+    ax.grid(False)
+
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
-def plot_2d_kmeans(latent_space, kmeans, logger, path, genre_filter, y_true, loader, h: float = 0.02):
+def plot_2d_kmeans_boundaries(latent_space, kmeans, logger, path, genre_filter, y_true, h: float = 0.02):
     # plot the decision boundary
     x_min, x_max = latent_space[:, 0].min() - 1, latent_space[:, 0].max() + 1
     y_min, y_max = latent_space[:, 1].min() - 1, latent_space[:, 1].max() + 1
@@ -122,25 +129,18 @@ def plot_2d_kmeans(latent_space, kmeans, logger, path, genre_filter, y_true, loa
 
     # obtain labels for each point in mesh. Use last trained model.
     Z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
-    unique_labels = np.unique(Z)
-    str_labels = loader.decode_label(unique_labels)
 
     # Put the result into a color plot
     Z = Z.reshape(xx.shape)
     plt.figure(1)
     plt.clf()
-    img = plt.imshow(Z, interpolation="nearest", extent=(xx.min(), xx.max(), yy.min(), yy.max()), cmap=plt.cm.Paired, aspect="auto", origin="lower")
-    colour_bar = plt.colorbar(img)
-
-    colour_bar.set_ticks(np.arange(len(unique_labels)))
-    colour_bar.set_ticklabels(str_labels)
-
+    plt.imshow(Z, interpolation="nearest", extent=(xx.min(), xx.max(), yy.min(), yy.max()), cmap=plt.cm.Paired, aspect="auto", origin="lower")
     plt.plot(latent_space[:, 0], latent_space[:, 1], "k.", markersize=2)
 
     # plot the centroids as a white X
     centroids = kmeans.cluster_centers_
     plt.scatter(centroids[:, 0], centroids[:, 1], marker="x", s=169, linewidths=3, color="w", zorder=10)
-    plt.title(f"K-means clustering after PCA (genres: {genre_filter})")
+    plt.title(f"K-means Clustering Boundaries (genres: {genre_filter})")
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
     plt.xticks(())
@@ -159,6 +159,21 @@ def plot_eigenvalues(path, pca_model: PCA, logger):
     plt.close()
     logger.info(f"Saved plot '{path}'")
 
+def analyse_kmeans(latent_space, logger, max_clusters=20, n_genres=10):
+    inertia = []
+    k_values = range(1, max_clusters + 1)
+    for k in k_values:
+        kmeans = KMeans(n_clusters=k)
+        kmeans.fit(latent_space)
+        inertia.append(kmeans.inertia_)
+
+    plt.figure(figsize=(8, 8))
+    plt.plot(k_values, inertia, color="blue", marker="o", linestyle="-")
+    plt.xlabel("Number of Clusters")
+    plt.ylabel("Inertia Score")
+    plt.title("KMeans Inertia against Number of Clusters")
+    plt.savefig(path)
+    logger.info(f"Saved plot '{path}'")
 
 def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, title, n_clusters=10, max_components=100):
     data = []
@@ -188,7 +203,7 @@ def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, titl
     for n in tqdm(range(2, max_components + 1), desc="Computing latent dimensions"):
         dim_reducer.n_components = n
         latent_space = dim_reducer.fit_transform(data)
-        kmeans_nmi, gm_nmi, db_scan_nmi, _ = cluster_info(latent_space, y_true, logger, n_clusters)
+        kmeans_nmi, gm_nmi, db_scan_nmi = nmi_scores(latent_space, y_true, n_clusters)
         if kmeans_nmi > best_kmeans:
             best_kmeans = kmeans_nmi
             best_kmeans_comp = n
@@ -223,6 +238,21 @@ def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, titl
 
     logger.info(f"Saved plot '{path}'")
 
+def get_dim_model(model_type):
+    if model_type.lower() == "pca":
+        return PCA(n_components=2)
+    elif model_type == "umap":
+        return umap.UMAP(n_components=2, init='random', n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=42)
+
+def get_genre_filter(genres_arg):
+    if genres_arg != "all":
+        genre_filter = genres_arg.replace(" ", "").split(",")
+        n_genres = len(genre_filter)
+    else:
+        genre_filter = []
+        n_genres = 10
+
+    return n_genres, genre_filter
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -243,31 +273,27 @@ if __name__ == "__main__":
         with utils.ReceiptReader(filename=os.path.join(uuid_dir, "receipt.json")) as receipt_reader:
             signal_processor = receipt_reader.signal_processor
 
-        if args.experiment_1:
-            # analyses the NMI scores against the latent space size
-            # this plots these results on two separate graphs
+        if args.nmi:
+            # analyses the NMI scores against the latent space size after pca or umap
+            # this plots these results on a graph
             # run this with different preprocessed datasets
 
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
 
-            pca_model = PCA()
-            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_pca_latent_dims_analysis.pdf")
-            logger.info("Latent space analysis for PCA")
-            analyse_latent_dims(dim_reducer=pca_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for PCA")
+            dim_model = get_dim_model(args.nmi)
 
-            # umap_model = umap.UMAP()
-            # path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_umap_latent_dims_analysis.pdf")
-            # logger.info("Latent space analysis for UMAP")
-            # analyse_latent_dims(dim_reducer=umap_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for UMAP")
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.nmi.lower()}_latent_dims_analysis.pdf")
+            logger.info(f"Latent space analysis for {args.nmi.lower()}")
+            analyse_latent_dims(dim_reducer=dim_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for {args.nmi.lower()}")
 
-        if args.experiment_2:
+        if args.eigen:
             # plots an eigenvalue plot obtained after performing pca with n_components
             # takes a flag for the number of components pca should use
             # run this with different preprocessed datasets
 
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
 
-            pca_model = PCA(n_components=args.experiment_2)
+            pca_model = PCA(n_components=args.eigen)
             data = []
             batch_loader = loader.load(split_type="all", normalise=True)
             print(loader.input_shape)
@@ -280,38 +306,91 @@ if __name__ == "__main__":
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_eigenvalues.pdf")
             plot_eigenvalues(path=path, pca_model=pca_model, logger=logger)
 
-        if args.experiment_3:
-            # takes a flag for the types of genres to filter to flag can be set to all to allow all genres
-            # uses kmeans to produce 2 plots:
-            # 1. being a kmeans visualisation with kmeans boundaries
-            # 2. a standard latent space visualisation
+        if args.boundaries:
+            # use pca or umap
+            # uses kmeans to produce kmeans boundaries plot
 
-            if args.experiment_3 != "all":
-                genre_filter = args.experiment_3.replace(" ", "").split(",")
-                n_clusters = len(genre_filter)
-            else:
-                genre_filter = []
-                n_clusters = 10
+            _, genre_filter = get_genre_filter(args.genres)
+
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
             data = []
             y_true = []
-            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
-
             for x, y in batch_loader:
                 x = x.numpy()
                 flattened = [i.flatten() for i in x]
                 data.extend(flattened)
                 y_true.extend(y)
 
-            pca_model = PCA(n_components=2)
-            pca_latent = pca_model.fit_transform(data)
+            dim_model = get_dim_model(args.boundaires)
 
-            kmeans = KMeans(n_clusters=n_clusters)
-            kmeans.fit(pca_latent)
+            latent = dim_model.fit_transform(data)
+            kmeans = KMeans(n_clusters=args.n_clusters)
+            kmeans.fit(latent)
 
-            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.experiment_3}_pca_kmeans_plot.pdf")
-            plot_2d_kmeans(kmeans=kmeans, latent_space=pca_latent, y_true=y_true, logger=logger, path=path, genre_filter=args.experiment_3, loader=loader)
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaires.lower()}_{args.genres}_kmeans_boundaries_{args.n_clusters}.pdf")
+            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres)
 
-            path = os.path.join(experiments_dir,f"{args.uuid}_{signal_processor}_{args.experiment_3}_pca_latent_space.pdf")
-            plot_2D(latent_space=pca_latent, y_true=y_true, logger=logger, path=path, genre_filter=args.experiment_3, loader=loader)
+        if args.inertia:
+            data = []
+            y_true = []
+            n_genres, genre_filter = get_genre_filter(args.genres)
+
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+            for x, y in batch_loader:
+                x = x.numpy()
+                flattened = [i.flatten() for i in x]
+                data.extend(flattened)
+                y_true.extend(y)
+
+            dim_model = get_dim_model(args.inertia)
+
+            latent_space = dim_model.fit_transform(data)
+            max_clusters = args.n_clusters
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.inertia.lower()}_{args.genres}_kmeans_inertia.pdf")
+            analyse_kmeans(latent_space=latent_space, max_clusters=max_clusters, logger=logger, n_genres=n_genres)
+
+        if args.visualise2d:
+            # use pca or umap
+            # plot latent space
+            _, genre_filter = get_genre_filter(args.genres)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+
+            data = []
+            y_true = []
+            for x, y in batch_loader:
+                x = x.numpy()
+                flattened = [i.flatten() for i in x]
+                data.extend(flattened)
+                y_true.extend(y)
+
+            dim_model = get_dim_model(args.visualise2d)
+            latent = dim_model.fit_transform(data)
+
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise2d.lower()}_{args.genres}_visualisation_2D.pdf")
+            plot_2D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader)
+
+        if args.visualise3d:
+            # use pca or umap
+            # plot latent space
+            _, genre_filter = get_genre_filter(args.genres)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+
+            data = []
+            y_true = []
+            for x, y in batch_loader:
+                x = x.numpy()
+                flattened = [i.flatten() for i in x]
+                data.extend(flattened)
+                y_true.extend(y)
+
+            dim_model = get_dim_model(args.visualise3d)
+            dim_model.n_components = 3
+            latent = dim_model.fit_transform(data)
+
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise3d.lower()}_{args.genres}_visualisation_3D.pdf")
+            plot_3D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader)

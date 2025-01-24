@@ -27,6 +27,20 @@ class ReceiptReader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         return
 
+class MultiLoader:
+    def __init__(self, uuid_list: list, out: str, logger, batch_size: int = 512):
+        self.uuid_list = uuid_list
+        self.out = out
+        self.logger = logger
+        self.input_shape = None
+        self.batch_size = batch_size
+        self.label_encoder = LabelEncoder()
+
+        # create test, train splits
+
+    def _make_splits(self, split_type):
+        pass
+
 class Loader:
     def __init__(self, uuid: str, out: str, logger, batch_size: int = 512):
         self.uuid = uuid
@@ -51,10 +65,10 @@ class Loader:
 
     def _make_splits(self, split_type: str) -> list:
         split = []
-        train_path = os.path.join(self.root, split_type)
-        for genre_dir in os.listdir(train_path):
+        split_path = os.path.join(self.root, split_type)
+        for genre_dir in os.listdir(split_path):
             if not genre_dir.startswith("."):
-                genre_path = os.path.join(train_path, genre_dir)
+                genre_path = os.path.join(split_path, genre_dir)
                 songs = os.listdir(genre_path)
                 for song in songs:
                     if not song.startswith("."):
@@ -87,8 +101,11 @@ class Loader:
 
         return dataloader
 
-    def decode_label(self, labels):
-        return self.label_encoder.inverse_transform(labels)
+    def encode_label(self, labels):
+        return self.label_encoder.transform(labels)
+
+    def decode_label(self, encoded_labels):
+        return self.label_encoder.inverse_transform(encoded_labels)
 
     def _get_data_split(self, split_type, normalise: bool, genre_filter: list):
         """
@@ -139,7 +156,7 @@ class Loader:
     def _normalise(signal_data: np.array) -> np.array:
         """
         Normalises the signals by subtracting the mean signal and dividing by the standard deviation. The mean signal
-        is a 2D array, and the standard deviation is a single scalar. This will scale the data between [-1,1].
+        is a 2D array, and the standard deviation is a single scalar.
 
         :param signal_data: signal data to be normalised (shape: [s,n,m])
         :return: normalised signal of size (shape: [s,n,m])
