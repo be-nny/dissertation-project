@@ -19,8 +19,9 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import normalized_mutual_info_score
 from sklearn.mixture import GaussianMixture
+
+import model.utils
 from model import utils
-from experimental_models import stacked_autoencoder
 
 matplotlib.use('TkAgg')
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -42,7 +43,13 @@ parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of ge
 
 BATCH_SIZE = 512
 
-def show_info(logger, config):
+def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
+    """
+    Shows all available datasets to in the output directory in 'config.yml'
+
+    :param logger: logger
+    :param config: config file
+    """
     datasets = os.listdir(config.OUTPUT_PATH)
 
     for uuid in datasets:
@@ -54,8 +61,7 @@ def show_info(logger, config):
 
             logger.info(out_str)
 
-
-def nmi_scores(latent_space, y_true, n_clusters: int = 10):
+def nmi_scores(latent_space, y_true, n_clusters: int = 10) -> tuple[float, float, float]:
     """
     With the provided latent space and true y values, the latent space is clustered using:
 
@@ -89,10 +95,22 @@ def nmi_scores(latent_space, y_true, n_clusters: int = 10):
     return kmeans_nmi, gm_nmi, db_scan_nmi
 
 
-def plot_3D(latent_space, y_true, path, logger, genre_filter, loader):
+def plot_3D(latent_space: np.ndarray, y_true: np.ndarray, path: str, logger: logger.logging.Logger, genre_filter: str, loader: model.utils.Loader) -> None:
+    """
+    Plots a 3 dimensional latent representation in 3D space
+
+    :param latent_space: 3D latent space
+    :param y_true: true labels
+    :param path: path to save
+    :param logger: logger
+    :param genre_filter: genre filters
+    :param loader: dataset loader
+    :return: None
+    """
+
     unique_labels = np.unique(y_true)
     str_labels = loader.decode_label(unique_labels)
-
+    print(latent_space.shape)
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
     scatter = ax.scatter(latent_space[:, 0], latent_space[:, 1], latent_space[:, 2], c=y_true, cmap='tab10', alpha=0.7, s=10)
@@ -110,7 +128,19 @@ def plot_3D(latent_space, y_true, path, logger, genre_filter, loader):
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
-def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
+def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, logger: logger.logging.Logger, genre_filter: str, loader: model.utils.Loader) -> None:
+    """
+    Plots a 2 dimensional latent representation in 2D space
+
+    :param latent_space: 2D latent space
+    :param y_true: true labels
+    :param path: path to save
+    :param logger: logger
+    :param genre_filter: genre filters
+    :param loader: dataset loader
+    :return: None
+    """
+
     unique_labels = np.unique(y_true)
     str_labels = loader.decode_label(unique_labels)
 
@@ -129,7 +159,16 @@ def plot_2D(latent_space, y_true, path, logger, genre_filter, loader):
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
-def cluster_statistics(y_true, y_pred, loader):
+def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: model.utils.Loader) -> dict:
+    """
+    Creates a dictionary containing which clusters have what genre in them. Each genre has a count of the number of samples in that cluster with that genre tag
+
+    :param y_true: true label values
+    :param y_pred: predicted label values
+    :param loader: dataset loader
+    :return: the cluster statistics
+    """
+
     cluster_stats = {}
 
     # convert the encoded labels back to strings
@@ -145,7 +184,15 @@ def cluster_statistics(y_true, y_pred, loader):
 
     return cluster_stats
 
-def plot_cluster_statistics(cluster_stats: dict, path, logger):
+def plot_cluster_statistics(cluster_stats: dict, path: str, logger: logger.logging.Logger) -> None:
+    """
+    Creates a figure with a set of pie chart subplots demonstrating which clusters have what genre in them.
+
+    :param cluster_stats: cluster statistics
+    :param path: path to save figure
+    :param logger: logger
+    """
+
     nrows = int(np.floor(np.sqrt(len(cluster_stats))))
     ncols = int(np.ceil(len(cluster_stats) / nrows))
 
@@ -175,7 +222,18 @@ def plot_cluster_statistics(cluster_stats: dict, path, logger):
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
-def plot_2d_kmeans_boundaries(latent_space, kmeans, logger, path, genre_filter, y_true, h: float = 0.02):
+def plot_2d_kmeans_boundaries(latent_space: np.ndarray, kmeans: KMeans, logger: logger.logging.Logger, path: str, genre_filter: str, h: float = 0.02) -> None:
+    """
+    Plots the kmeans decision boundaries
+
+    :param latent_space: 2D latetn space
+    :param kmeans: KMeans object
+    :param logger: logger
+    :param path: path to save
+    :param genre_filter: genre filter
+    :param h: step size for the grid used to create the mesh for plotting the decision boundaries
+    """
+
     # colour map
     cmap = ListedColormap(plt.cm.get_cmap("tab20", kmeans.n_clusters).colors)
 
@@ -212,7 +270,7 @@ def plot_2d_kmeans_boundaries(latent_space, kmeans, logger, path, genre_filter, 
     plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
-def plot_eigenvalues(path, pca_model: PCA, logger):
+def plot_eigenvalues(path, pca_model: PCA, logger: logger.logging.Logger) -> None:
     plt.plot([i for i in range(1, pca_model.n_components + 1)], pca_model.explained_variance_, marker="o", linestyle="-", label="Eigenvalues")
     plt.xlabel("Number of Components")
     plt.ylabel("Eigenvalues (log)")
@@ -312,18 +370,18 @@ def analyse_latent_dims(dim_reducer: PCA | umap.UMAP, loader, logger, path, titl
     logger.info(f"Saved plot '{path}'")
 
 def load_flatten(batch_loader):
-    data = []
-    y_true = []
+    flattened_data = []
+    flattened_y_true = []
     for x, y in batch_loader:
         x = x.numpy()
         flattened = [i.flatten() for i in x]
-        data.extend(flattened)
-        y_true.extend(y)
+        flattened_data.extend(flattened)
+        flattened_y_true.extend(y)
 
-    return data, y_true
+    return flattened_data, flattened_y_true
 
 def get_dim_model(model_type):
-    seed=42
+    seed = 42
     if model_type.lower() == "pca":
         return PCA(n_components=2, random_state=seed)
     elif model_type == "umap":
@@ -412,7 +470,7 @@ if __name__ == "__main__":
 
             # plot boundaries
             path1 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_kmeans_boundaries_{args.n_clusters}.pdf")
-            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, y_true=y_true, logger=logger, path=path1, genre_filter=args.genres)
+            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, logger=logger, path=path1, genre_filter=args.genres)
 
             # plot genre spread
             stats = cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
