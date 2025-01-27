@@ -85,7 +85,7 @@ class Loader:
             data = np.concatenate((d1, d2), axis=0)
             labels = np.concatenate((l1, l2), axis=0)
         else:
-            data, labels = self._get_data_split(split_type=split_type, normalise=normalise)
+            data, labels = self._get_data_split(split_type=split_type, normalise=normalise, genre_filter=genre_filter)
 
         data = np.array(data)
 

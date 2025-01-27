@@ -50,8 +50,8 @@ class SAE(_StackedAutoEncoderModel):
         self.latent_dim = hidden_layers[-1]
 
         self.lr = 1e-3
-        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-3)
-        self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
+        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-2)
+        self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=5000, gamma=0.1)
 
         if torch.cuda.is_available():
             self.logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
@@ -93,6 +93,18 @@ class SAE(_StackedAutoEncoderModel):
 
         # plot pre-training loss
         self._plot_loss(epochs=[i for i in range(1, len(total_losses) + 1)], loss_data=total_losses, best_loss=best_loss)
+
+    def fit_latent(self, loader):
+        self.eval()
+        latent_space = []
+        y_true = []
+        for x_data, y_labels in loader:
+            x_data = x_data.to(self.device)
+            l, _ = self(x_data)
+            y_true.extend(y_labels.detach().numpy())
+            latent_space.extend(l.detach().numpy())
+
+        return np.array(latent_space), np.array(y_true)
 
     def _plot_loss(self, loss_data, epochs, best_loss):
         path = os.path.join(self.figures_path, f"{self.uuid}_loss.pdf")
