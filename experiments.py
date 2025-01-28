@@ -8,6 +8,7 @@ import matplotlib
 
 from kneed import KneeLocator
 from matplotlib.colors import ListedColormap
+from matplotlib.patches import Ellipse
 from torch.utils.data import TensorDataset, DataLoader
 
 import config
@@ -34,6 +35,7 @@ parser.add_argument("-i", "--info", action="store_true", help="Returns a list of
 parser.add_argument("-n", "--nmi", type=str, help="Plots NMI score against the number of UMAP or PCA components. Set flag to 'pca' or 'umap'")
 parser.add_argument("-e", "--eigen", type=int, help="Plots the eigenvalues obtained after performing PCA. Takes value for max n_components")
 parser.add_argument("-b", "--boundaries", help="Plots 2D Kmeans Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
+parser.add_argument("-s", "--gaussian", help="Plots 2D Gaussian Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
 parser.add_argument("-t", "--inertia", help="Plots number of clusters against kmeans inertia score for UMAP or PCA. '-g' must also be set. '-nc' must be set for the max. number of clusters")
 parser.add_argument("-v2", "--visualise2d", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
 parser.add_argument("-v3", "--visualise3d", help="Plots 3D Latent Space of UMAP or PCA. '-g' must also be set.")
@@ -60,40 +62,6 @@ def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
                 out_str = f"{uuid} - {receipt_reader.signal_processor:<15} SAMPLE SIZE: {receipt_reader.total_samples:<5} SEGMENT DURATION:{receipt_reader.seg_dur:<5} CREATED:{receipt_reader.created_time:<10}"
 
             logger.info(out_str)
-
-def nmi_scores(latent_space, y_true, n_clusters: int = 10) -> tuple[float, float, float]:
-    """
-    With the provided latent space and true y values, the latent space is clustered using:
-
-    - kmeans
-    - GMM
-    - DBSCAN
-
-    The NMI score for each clustering output is computed.
-
-    :param latent_space: latent space to cluster
-    :param y_true: true labels
-    :param n_clusters: number of clusters
-    :return: kmeans_nmi, gm_nmi, db_scan_nmi
-    """
-
-    # run kmeans
-    kmeans = KMeans(n_clusters=n_clusters)
-    y_pred = kmeans.fit_predict(latent_space)
-    kmeans_nmi = normalized_mutual_info_score(y_true, y_pred)
-
-    # run dbscan
-    db_scan = DBSCAN()
-    y_pred = db_scan.fit_predict(latent_space)
-    db_scan_nmi = normalized_mutual_info_score(y_true, y_pred)
-
-    # gaussian model
-    gm = GaussianMixture(n_components=10)
-    y_pred = gm.fit_predict(latent_space)
-    gm_nmi = normalized_mutual_info_score(y_true, y_pred)
-
-    return kmeans_nmi, gm_nmi, db_scan_nmi
-
 
 def plot_3D(latent_space: np.ndarray, y_true: np.ndarray, path: str, logger: logger.logging.Logger, genre_filter: str, loader: model.utils.Loader) -> None:
     """
@@ -193,8 +161,8 @@ def plot_cluster_statistics(cluster_stats: dict, path: str, logger: logger.loggi
     :param logger: logger
     """
 
-    nrows = int(np.floor(np.sqrt(len(cluster_stats))))
-    ncols = int(np.ceil(len(cluster_stats) / nrows))
+    ncols = 4
+    nrows = int(np.ceil(len(cluster_stats) / ncols))
 
     fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(15, 10), layout="constrained")
 
@@ -278,6 +246,43 @@ def plot_eigenvalues(path, pca_model: PCA, logger: logger.logging.Logger) -> Non
     plt.title("PCA Eigenvalues (log scale)")
     plt.savefig(path)
     plt.close()
+    logger.info(f"Saved plot '{path}'")
+
+
+def draw_ellipse(position, covariance, ax=None, **kwargs):
+    """Draw an ellipse with a given position and covariance"""
+    ax = ax or plt.gca()
+
+    # convert covariance to principal axes
+    if covariance.shape == (2, 2):
+        U, s, Vt = np.linalg.svd(covariance)
+        angle = np.degrees(np.arctan2(U[1, 0], U[0, 0]))
+        width, height = 2 * np.sqrt(s)
+    else:
+        angle = 0
+        width, height = 2 * np.sqrt(covariance)
+
+    # draw the Ellipse
+    for nsig in range(1, 4):
+        ax.add_patch(Ellipse(position, nsig * width, nsig * height, angle=angle, **kwargs))
+
+def plot_gmm(gmm, X, labels, path, logger, ax=None):
+    cmap = ListedColormap(plt.cm.get_cmap("tab20", gmm.n_components).colors)
+
+    ax = ax or plt.gca()
+    scatter = ax.scatter(X[:, 0], X[:, 1], c=labels, s=10, cmap=cmap, zorder=2)
+    ax.axis('equal')
+
+    w_factor = 0.2 / gmm.weights_.max()
+    for pos, covar, w in zip(gmm.means_, gmm.covariances_, gmm.weights_):
+        draw_ellipse(pos, covar, alpha=w * w_factor)
+
+    colorbar = plt.colorbar(scatter, ax=ax, ticks=np.arange(gmm.n_components))
+    colorbar.set_label('Cluster Labels', rotation=270, labelpad=15)
+    colorbar.set_ticks(np.arange(gmm.n_components))
+    colorbar.set_ticklabels([f"Cluster {i}" for i in range(gmm.n_components)])
+
+    plt.savefig(path)
     logger.info(f"Saved plot '{path}'")
 
 def analyse_kmeans(latent_space, logger, max_clusters=20, n_genres=10):
@@ -416,30 +421,15 @@ if __name__ == "__main__":
         with utils.ReceiptReader(filename=os.path.join(uuid_dir, "receipt.json")) as receipt_reader:
             signal_processor = receipt_reader.signal_processor
 
-        if args.nmi:
-            experiments_dir = os.path.join(experiments_dir_root, "nmi-plots")
-            if not os.path.exists(experiments_dir):
-                os.mkdir(experiments_dir)
-
-            # analyses the NMI scores against the latent space size after pca or umap
-            # this plots these results on a graph
+        if args.eigen:
+            # plots an eigenvalue plot obtained after performing pca with n_components
+            # takes a flag for the number of components pca should use
             # run this with different preprocessed datasets
 
-            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            dim_model = get_dim_model(args.nmi)
-
-            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.nmi.lower()}_latent_dims_analysis.pdf")
-            logger.info(f"Latent space analysis for {args.nmi.lower()}")
-            analyse_latent_dims(dim_reducer=dim_model, loader=loader, logger=logger, path=path, max_components=200, n_clusters=10, title=f"{signal_processor} Latent Space Analysis for {args.nmi.lower()}")
-
-        if args.eigen:
             experiments_dir = os.path.join(experiments_dir_root, "eigenvalue-plots")
             if not os.path.exists(experiments_dir):
                 os.mkdir(experiments_dir)
 
-            # plots an eigenvalue plot obtained after performing pca with n_components
-            # takes a flag for the number of components pca should use
-            # run this with different preprocessed datasets
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
             pca_model = PCA(n_components=args.eigen)
 
@@ -448,6 +438,29 @@ if __name__ == "__main__":
             pca_model.fit(data)
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_eigenvalues.pdf")
             plot_eigenvalues(path=path, pca_model=pca_model, logger=logger)
+
+        if args.gaussian:
+            experiments_dir = os.path.join(experiments_dir_root, "gaussian-plots")
+            if not os.path.exists(experiments_dir):
+                os.mkdir(experiments_dir)
+
+            _, genre_filter = get_genre_filter(args.genres)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+
+            data, y_true = load_flatten(batch_loader)
+            dim_model = get_dim_model(args.gaussian)
+            latent_data = dim_model.fit_transform(data).astype(np.float64)
+
+            gmm = GaussianMixture(n_components=args.n_clusters, random_state=42, covariance_type='full')
+            y_pred = gmm.fit_predict(latent_data)
+
+            path1 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.gaussian.lower()}_{args.genres}_gaussian_boundaries_{args.n_clusters}.pdf")
+            plot_gmm(gmm=gmm, X=latent_data, labels=y_pred, path=path1, logger=logger)
+
+            stats = cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
+            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.gaussian.lower()}_{args.genres}_genre_spread_{args.n_clusters}.pdf")
+            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger)
 
         if args.boundaries:
             # use pca or umap
@@ -532,3 +545,4 @@ if __name__ == "__main__":
 
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise3d.lower()}_{args.genres}_visualisation_3D.pdf")
             plot_3D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader)
+
