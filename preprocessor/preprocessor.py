@@ -10,11 +10,63 @@ import logging
 
 from audioread import NoBackendError
 from pycparser.ply.cpp import Preprocessor
-from sklearn.preprocessing import StandardScaler, QuantileTransformer, Normalizer, MinMaxScaler
 from tqdm import tqdm
 
 from . import signal_processor
 from . import utils
+
+
+def _rms_normalise_audio(wave, rms=0.1):
+    """
+    Root Mean Squared (RMS) audio normalisation. Balances the perceived loudness to create a cohesive
+    sound across all sources.
+
+    :param wave: input wave
+    :param rms: rms level in dB
+    :return: normalised wave
+    """
+
+    rms_original = np.sqrt(np.mean(wave ** 2))
+    scale_factor = rms / (rms_original + 1e-10)
+    wave_normalised = wave * scale_factor
+    return wave_normalised
+
+
+def _normalise_length(wave, sr, target_length):
+    """
+    Normalise the length of a waveform so that it is the same length as the target length
+
+    :param wave: waveform to normalise
+    :param sr: the sample rate
+    :return: a waveform that is the same length as the target length and padded if necessary
+    """
+
+    duration = librosa.get_duration(y=wave, sr=sr)
+    diff = target_length - duration
+    diff_samples = math.fabs(diff * sr)
+
+    # if the number of samples is larger than the target length, truncate it down
+    # if it's smaller the SignalProcessor will pad the wav
+    if diff < 0:
+        new_samples = int(len(wave) - diff_samples)
+        wave = wave[:new_samples]
+
+    return wave
+
+
+def _create_hdf(path: str, **kwargs):
+    """
+    Construct a HDF5 file for a preprocessed song and save it to 'path'.
+
+    :param path: path to save the HDF5 file
+    :param kwards: key value pairs for the hdf file
+    :return:
+    """
+
+    with h5py.File(path, 'w') as hdf5_file:
+        for key, data in kwargs.items():
+            hdf5_file.create_dataset(key, data=data)
+
 
 class Preprocessor:
     def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, train_split=0.6, segment_duration=10):
@@ -73,103 +125,51 @@ class Preprocessor:
         self.signal_processor = signal_processor
         return self
 
-    def _create_hdf(self, path: str, **kwargs):
-        """
-        Construct a HDF5 file for a preprocessed song and save it to 'path'.
-
-        :param path: path to save the HDF5 file
-        :param kwards: key value pairs for the hdf file
-        :return:
-        """
-
-        with h5py.File(path, 'w') as hdf5_file:
-            for key, data in kwargs.items():
-                hdf5_file.create_dataset(key, data=data)
-
-    def _normalise_length(self, wave, sr):
-        """
-        Normalise the length of a waveform so that it is the same length as the target length
-
-        :param wave: waveform to normalise
-        :param sr: the sample rate
-        :return: a waveform that is the same length as the target length and padded if necessary
-        """
-
-        duration = librosa.get_duration(y=wave, sr=sr)
-        diff = self.target_length - duration
-        diff_samples = math.fabs(diff * sr)
-
-        # if the number of samples is larger than the target length, truncate it down
-        # if it's smaller the SignalProcessor will pad the wav
-        if diff < 0:
-            new_samples = int(len(wave) - diff_samples)
-            wave = wave[:new_samples]
-
-        return wave
-
-    def _rms_normalise_audio(self, wave, rms=0.1):
-        """
-        Root Mean Squared (RMS) audio normalisation. Balances the perceived loudness to create a cohesive
-        sound across all sources.
-
-        :param wave: input wave
-        :param rms: rms level in dB
-        :return: normalised wave
-        """
-
-        rms_original = np.sqrt(np.mean(wave ** 2))
-        scale_factor = rms / rms_original
-        wave_normalised = wave * scale_factor
-        return wave_normalised
-
-    def _process(self, path: str, genre: str, split_type: str) -> None:
-        """
-        Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
-
-        :param genre: genre of the song being processed
-        :param path: path to audio file
-        """
-
-        # load wave source
-        wave, sr = librosa.load(path, sr=None)
-
-        # normalise the length of the audio file
-        wave = self._normalise_length(wave, sr)
-        wave = self._rms_normalise_audio(wave)
-
-        filename = os.path.basename(path)
-        name, _ = os.path.splitext(filename)
-
-        if split_type == 'train':
-            output_dir = os.path.join(self.train_split, genre)
-        else:
-            output_dir = os.path.join(self.test_split, genre)
-
-        # creating directory for the genre to put the different spectra in
-        if not os.path.exists(output_dir):
-            os.mkdir(output_dir)
-
-        # use the signal processor context to create generator that creates the song snippets
-        with signal_processor.SignalLoader(wave, sr, segment_duration=self.segment_duration) as loader:
-            count = 1
-            for segment in loader:
-                if len(segment) == 0:
-                    break
-
-                # generate the desired audio spectrogram
-                raw_signal = self.signal_processor(segment, sr)
-
-                scalar = MinMaxScaler(feature_range=(-3, 3))
-                raw_signal = scalar.fit_transform(raw_signal)
-
-                # save the layers to HDF5 file
-                file_name = os.path.join(output_dir, f"{name}_{count}.h5")
-                self._create_hdf(path=file_name, signal=raw_signal, genre=genre)
-
-                # properly discard the layers arr
-                del raw_signal
-                self.total += 1
-                count += 1
+    # def _process(self, path: str, genre: str, split_type: str) -> None:
+    #     """
+    #     Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
+    #
+    #     :param genre: genre of the song being processed
+    #     :param path: path to audio file
+    #     """
+    #
+    #     # load wave source
+    #     wave, sr = librosa.load(path, sr=None)
+    #
+    #     # normalise the length of the audio file
+    #     wave = _normalise_length(wave, sr, self.target_length)
+    #     wave = _rms_normalise_audio(wave)
+    #
+    #     filename = os.path.basename(path)
+    #     name, _ = os.path.splitext(filename)
+    #
+    #     if split_type == 'train':
+    #         output_dir = os.path.join(self.train_split, genre)
+    #     else:
+    #         output_dir = os.path.join(self.test_split, genre)
+    #
+    #     # creating directory for the genre to put the different spectra in
+    #     if not os.path.exists(output_dir):
+    #         os.mkdir(output_dir)
+    #
+    #     # use the signal processor context to create generator that creates the song snippets
+    #     with signal_processor.SignalLoader(wave, sr, segment_duration=self.segment_duration) as loader:
+    #         count = 1
+    #         for segment in loader:
+    #             if len(segment) == 0:
+    #                 break
+    #
+    #             # generate the desired audio spectrogram
+    #             raw_signal = self.signal_processor(segment, sr)
+    #
+    #             # save the layers to HDF5 file
+    #             file_name = os.path.join(output_dir, f"{name}_{count}.h5")
+    #             _create_hdf(path=file_name, signal=raw_signal, genre=genre)
+    #
+    #             # properly discard the layers arr
+    #             del raw_signal
+    #             self.total += 1
+    #             count += 1
 
     def preprocess(self):
         """
@@ -190,6 +190,36 @@ class Preprocessor:
 
         # write receipt file
         self.write_receipt()
+
+    def _process(self, path: str, genre: str, split_type: str) -> None:
+        """
+        Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
+
+        :param genre: genre of the song being processed
+        :param path: path to audio file
+        """
+
+        # get the name of the audio file
+        filename = os.path.basename(path)
+        name, _ = os.path.splitext(filename)
+
+        if split_type == 'train':
+            output_dir = os.path.join(self.train_split, genre)
+        else:
+            output_dir = os.path.join(self.test_split, genre)
+
+        # creating directory for the genre to put the different spectra in
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
+
+        # use the signal processor context to create generator that creates the song snippets
+        signals = apply_signal(path=path, signal_func=self.signal_processor, segment_duration=self.segment_duration, target_length=self.target_length)
+
+        # save the layers to HDF5 file
+        for i, signal in enumerate(signals):
+            file_name = os.path.join(output_dir, f"{name}_{i}.h5")
+            _create_hdf(path=file_name, signal=signal, genre=genre)
+            self.total += 1
 
     def write_receipt(self):
         """
@@ -250,3 +280,34 @@ class Preprocessor:
         """
 
         return self.figures_path
+
+def apply_signal(path: str, signal_func, segment_duration, target_length=None) -> np.ndarray:
+    """
+    """
+
+    # load wave source
+    wave, sr = librosa.load(path, sr=None)
+
+    if target_length is not None:
+        # normalise the length of the audio file
+        wave = _normalise_length(wave, sr, target_length)
+
+    # normalise the length of the audio file
+    wave = _rms_normalise_audio(wave)
+    data = []
+
+    # use the signal processor context to create generator that creates the song snippets
+    with signal_processor.SignalLoader(wave, sr, segment_duration=segment_duration) as loader:
+        for segment in loader:
+            if len(segment) == 0:
+                break
+
+            # generate the desired audio spectrogram
+            raw_signal = signal_func(segment, sr)
+
+            # remove any NaN values
+
+            # properly discard the layers arr
+            data.append(raw_signal)
+
+    return np.array(data)

@@ -1,28 +1,16 @@
 import os
 import argparse
 import os.path
-import numpy as np
-import pandas as pd
-import torch
-import squarify
 import umap.umap_ as umap
-import matplotlib
-from plot_lib.plotter import *
 
-from kneed import KneeLocator
-from matplotlib.colors import ListedColormap
-from matplotlib.patches import Ellipse
-from pypalettes import load_cmap
-from torch.utils.data import TensorDataset, DataLoader
+from experimental_models import conv_autoencoder
+from experimental_models.plotter import *
 
 import config
 import logger
 
 from sklearn.decomposition import PCA
-from tqdm import tqdm
-from matplotlib import pyplot as plt
-from sklearn.cluster import KMeans, DBSCAN
-from sklearn.metrics import normalized_mutual_info_score
+from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 
 import model.utils
@@ -32,7 +20,7 @@ matplotlib.use('TkAgg')
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
+parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
@@ -43,9 +31,9 @@ parser.add_argument("-s", "--gaussian", help="Plots 2D Gaussian Boundaries of UM
 parser.add_argument("-t", "--inertia", help="Plots number of clusters against kmeans inertia score for UMAP or PCA. '-g' must also be set. '-nc' must be set for the max. number of clusters")
 parser.add_argument("-v2", "--visualise2d", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
 parser.add_argument("-v3", "--visualise3d", help="Plots 3D Latent Space of UMAP or PCA. '-g' must also be set.")
-parser.add_argument("-sae", "--stackedae", action="store_true", help="Plots 2D Latent Space using a stacked auto encoder. '-g' must also be set.")
+parser.add_argument("-o", "--conv", action="store_true", help="Train convolutional autoencoder. '-g' must also be set.")
 parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters")
-parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to all, all genres are used")
+parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 
 BATCH_SIZE = 512
 
@@ -155,7 +143,9 @@ if __name__ == "__main__":
             data, y_true = load_flatten(batch_loader)
             pca_model.fit(data)
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_eigenvalues.pdf")
-            plot_eigenvalues(path=path, pca_model=pca_model, logger=logger)
+
+            title = f"PCA Eigenvalues (log scale) with {signal_processor} applied"
+            plot_eigenvalues(path=path, pca_model=pca_model, logger=logger, title=title)
 
         if args.gaussian:
             experiments_dir = os.path.join(experiments_dir_root, "gaussian-plots")
@@ -174,11 +164,13 @@ if __name__ == "__main__":
             y_pred = gmm.fit_predict(latent_data)
 
             path1 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.gaussian.lower()}_{args.genres}_gaussian_boundaries_{args.n_clusters}.pdf")
-            plot_gmm(gmm=gmm, X=latent_data, labels=y_pred, path=path1, logger=logger)
+            title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+            plot_gmm(gmm=gmm, X=latent_data, labels=y_pred, path=path1, logger=logger, title=title)
 
             stats = cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
-            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.gaussian.lower()}_{args.genres}_genre_spread_{args.n_clusters}.pdf")
-            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger)
+            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.gaussian.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
+            title = f"Treemap with {signal_processor} applied"
+            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger, title=title)
 
         if args.boundaries:
             # use pca or umap
@@ -201,12 +193,14 @@ if __name__ == "__main__":
 
             # plot boundaries
             path1 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_kmeans_boundaries_{args.n_clusters}.pdf")
-            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, logger=logger, path=path1, genre_filter=args.genres)
+            title = f"K-Means cluster boundaries with {signal_processor} applied"
+            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, logger=logger, path=path1, genre_filter=args.genres, title=title)
 
             # plot genre spread
             stats = cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
-            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_genre_spread_{args.n_clusters}.pdf")
-            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger)
+            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
+            title = f"Treemap with {signal_processor} applied"
+            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger, title=title)
 
         if args.inertia:
             experiments_dir = os.path.join(experiments_dir_root, "kmeans-inertia-plots")
@@ -222,7 +216,8 @@ if __name__ == "__main__":
             latent_space = dim_model.fit_transform(data)
             max_clusters = args.n_clusters
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.inertia.lower()}_{args.genres}_kmeans_inertia.pdf")
-            plot_inertia(latent_space=latent_space, max_clusters=max_clusters, logger=logger, n_genres=n_genres, path=path)
+            title = f"KMeans Inertia with {signal_processor} applied"
+            plot_inertia(latent_space=latent_space, max_clusters=max_clusters, logger=logger, n_genres=n_genres, path=path, title=title)
 
         if args.visualise2d:
             # use pca or umap
@@ -241,7 +236,8 @@ if __name__ == "__main__":
             latent = dim_model.fit_transform(data)
 
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise2d.lower()}_{args.genres}_visualisation_2D.pdf")
-            plot_2D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader)
+            title = f"Latent Space in 2D with {signal_processor} applied using {args.visualise2d.lower()}"
+            plot_2D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader, title=title)
 
         if args.visualise3d:
             # use pca or umap
@@ -262,5 +258,21 @@ if __name__ == "__main__":
             latent = dim_model.fit_transform(data)
 
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise3d.lower()}_{args.genres}_visualisation_3D.pdf")
-            plot_3D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader)
+            title = f"Latent Space in 3D with {signal_processor} applied using {args.visualise2d.lower()}"
+            plot_3D(latent_space=latent, y_true=np.array(y_true), logger=logger, path=path, genre_filter=args.genres, loader=loader, title=title)
+
+        if args.conv:
+            experiments_dir = os.path.join(experiments_dir_root, "convolutional_ae")
+            if not os.path.exists(experiments_dir):
+                os.mkdir(experiments_dir)
+
+            _, genre_filter = get_genre_filter(args.genres)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            batch_loader = loader.load(split_type="train", normalise=True, genre_filter=genre_filter)
+
+            conv_ae = conv_autoencoder.ConvAutoencoder(latent_dim=2, n_layers=[128, 64, 32, 16], input_shape=loader.input_shape, loader=batch_loader, logger=logger, uuid=args.uuid, figures_path=experiments_dir)
+            conv_ae.train_autoencoder(epochs=250)
+
+            # dec_model = deep_clustering.DeepClustering(latent_dims=2, n_clusters=10, convolutional_ae=conv_ae, loader=batch_loader, logger=logger, figures_path=experiments_dir, uuid=args.uuid)
+            # dec_model.train(epochs=500)
 

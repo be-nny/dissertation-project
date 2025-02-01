@@ -1,13 +1,10 @@
-import math
 import os
 import matplotlib
 import numpy as np
 import torch
 
 from matplotlib import pyplot as plt
-from sklearn.metrics import silhouette_score
 from torch.nn import MSELoss
-from tslearn.metrics import SoftDTWLossPyTorch
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
@@ -40,10 +37,6 @@ class _ConvAutoEncoderModel(nn.Module):
         encoder_layers.append(nn.Linear(self.current_length*n_layers[-1], latent_dim))
         encoder_layers.append(nn.LeakyReLU())
 
-        # adding mean and log variance layers for kl divergence
-        self.z_mean = nn.Linear(latent_dim, latent_dim)
-        self.z_log_var = nn.Linear(latent_dim, latent_dim)
-
         # conv decoder
         reversed_layers = n_layers[::-1]
         decoder_layers = [
@@ -63,7 +56,6 @@ class _ConvAutoEncoderModel(nn.Module):
     def forward(self, x):
         # encode the data
         latent = self.encoder(x)
-
         # convert the flattened latent space back into 2d space
         linear = self.linear_decoder(latent)
         linear_reshaped = linear.view(linear.size(0), self.n_layers[-1], self.current_length)
@@ -75,18 +67,17 @@ class _ConvAutoEncoderModel(nn.Module):
 
 
 class ConvAutoencoder(_ConvAutoEncoderModel):
-    def __init__(self, n_layers, input_shape, uuid, logger, loader, epochs, figures_path, latent_dim):
+    def __init__(self, n_layers, input_shape, uuid, logger, loader, figures_path, latent_dim):
         super().__init__(n_layers=n_layers, input_shape=input_shape, latent_dim=latent_dim)
 
         self.uuid = uuid
         self.logger = logger
         self.loader = loader
-        self.epochs = epochs
         self.figures_path = figures_path
 
         self.lr = 1e-3
-        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-3)
-        self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=1000, gamma=0.1)
+        self.optimiser = torch.optim.AdamW(self.parameters(), self.lr, weight_decay=1e-2)
+        self.scheduler = lr_scheduler.StepLR(self.optimiser, step_size=100, gamma=0.1)
 
         if torch.cuda.is_available():
             self.logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
@@ -94,7 +85,7 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
             self.logger.info("No GPU available. Training will run on CPU.")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def train_autoencoder(self):
+    def train_autoencoder(self, epochs):
         self.train()
         self.to(self.device)
 
@@ -102,7 +93,7 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
         total_losses = []
         best_loss = (np.inf, 0)
 
-        tqdm_loop = tqdm(range(self.epochs), desc="Training Convolutional Autoencoder", unit="epoch")
+        tqdm_loop = tqdm(range(epochs), desc="Training Convolutional Autoencoder", unit="epoch")
         for epoch in tqdm_loop:
             losses = []
             for x_data, y_true in self.loader:
@@ -115,8 +106,8 @@ class ConvAutoencoder(_ConvAutoEncoderModel):
                 x_data = x_data.to(self.device)
                 latent_space, reconstructed = self(x_data)
 
-                # the reconstructed data must be the same size, pad it
-                reconstructed = nn.functional.pad(reconstructed, (0, 1))
+                # the reconstructed data must be the same size, interpolate the reconstructed to be the same size
+                reconstructed = nn.functional.interpolate(reconstructed, size=(x_data.shape[-1],), mode="nearest")
                 loss = loss_fn(reconstructed, x_data)
 
                 losses.append(loss.item())

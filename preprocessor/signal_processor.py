@@ -16,10 +16,10 @@ plt.figure()
 plt.close()
 
 FIGURE_SIZE = (10, 10)
-N_FFT = 512
-NPERSEG = 256
-HOP_LENGTH = 512
-N_MELS = 128
+N_FFT = 2048
+NPERSEG = 2048
+HOP_LENGTH = 256
+N_MELS = 256
 
 class SignalLoader:
     def __init__(self, wave: np.ndarray, sr: float, segment_duration=10):

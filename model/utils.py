@@ -27,20 +27,6 @@ class ReceiptReader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         return
 
-class MultiLoader:
-    def __init__(self, uuid_list: list, out: str, logger, batch_size: int = 512):
-        self.uuid_list = uuid_list
-        self.out = out
-        self.logger = logger
-        self.input_shape = None
-        self.batch_size = batch_size
-        self.label_encoder = LabelEncoder()
-
-        # create test, train splits
-
-    def _make_splits(self, split_type):
-        pass
-
 class Loader:
     def __init__(self, uuid: str, out: str, logger, batch_size: int = 512):
         self.uuid = uuid
