@@ -5,7 +5,7 @@ import config
 import logger
 import model
 
-from model import utils, metric_learner
+from model import utils, models
 from preprocessor import preprocessor
 from plot_lib import plotter
 
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
         # create metric learner
-        metric_l = metric_learner.MetricLearner(loader=batch_loader, n_clusters=args.n_clusters)
+        metric_l = models.MetricLearner(loader=batch_loader, n_clusters=args.n_clusters)
         metric_l.create_latent()
         latent_space, y_pred, y_true = metric_l.get_latent(), metric_l.get_y_pred(), metric_l.get_y_true()
 
@@ -116,19 +116,23 @@ if __name__ == "__main__":
 
             # plot gaussian plot
             path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}_{file_name}.pdf"
-            plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, labels=y_pred, new_data=new_latent, new_label=file_name,logger=logger)
+            title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+            plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, labels=y_pred, new_data=new_latent, new_label=file_name, logger=logger, title=title)
 
             # get cluster stats for tree maps
             path = f"{root}/tree_map_{args.n_clusters}_{args.genres}_{file_name}.pdf"
+            title = f"Treemap with {signal_processor} applied"
             cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
-            plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger)
+            plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
 
         else:
             # get cluster stats for tree maps
             path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"
+            title = f"Treemap with {signal_processor} applied"
             cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
-            plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger)
+            plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
 
             # plot gaussian plot
             path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}.pdf"
-            plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, logger=logger, labels=y_pred)
+            title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+            plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, logger=logger, labels=y_pred, title=title)

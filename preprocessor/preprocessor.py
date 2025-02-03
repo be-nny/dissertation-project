@@ -112,7 +112,7 @@ class Preprocessor:
         self.target_length = target_length
 
         self.reader = utils.DatasetReader(self.dataset_dir, self.logger, train_split=train_split)
-        self.total = 0
+        self.total = 1
 
     def set_signal_processor(self, signal_processor) -> Preprocessor:
         """
@@ -124,52 +124,6 @@ class Preprocessor:
 
         self.signal_processor = signal_processor
         return self
-
-    # def _process(self, path: str, genre: str, split_type: str) -> None:
-    #     """
-    #     Preprocesses a song and generates a set of audio spectra specified in `set_layers()` (see -h, --help for more info)
-    #
-    #     :param genre: genre of the song being processed
-    #     :param path: path to audio file
-    #     """
-    #
-    #     # load wave source
-    #     wave, sr = librosa.load(path, sr=None)
-    #
-    #     # normalise the length of the audio file
-    #     wave = _normalise_length(wave, sr, self.target_length)
-    #     wave = _rms_normalise_audio(wave)
-    #
-    #     filename = os.path.basename(path)
-    #     name, _ = os.path.splitext(filename)
-    #
-    #     if split_type == 'train':
-    #         output_dir = os.path.join(self.train_split, genre)
-    #     else:
-    #         output_dir = os.path.join(self.test_split, genre)
-    #
-    #     # creating directory for the genre to put the different spectra in
-    #     if not os.path.exists(output_dir):
-    #         os.mkdir(output_dir)
-    #
-    #     # use the signal processor context to create generator that creates the song snippets
-    #     with signal_processor.SignalLoader(wave, sr, segment_duration=self.segment_duration) as loader:
-    #         count = 1
-    #         for segment in loader:
-    #             if len(segment) == 0:
-    #                 break
-    #
-    #             # generate the desired audio spectrogram
-    #             raw_signal = self.signal_processor(segment, sr)
-    #
-    #             # save the layers to HDF5 file
-    #             file_name = os.path.join(output_dir, f"{name}_{count}.h5")
-    #             _create_hdf(path=file_name, signal=raw_signal, genre=genre)
-    #
-    #             # properly discard the layers arr
-    #             del raw_signal
-    #             self.total += 1
-    #             count += 1
 
     def preprocess(self):
         """

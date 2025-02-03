@@ -4,7 +4,7 @@ import os.path
 import umap.umap_ as umap
 
 from experimental_models import conv_autoencoder
-from experimental_models.plotter import *
+from plot_lib.plotter import *
 
 import config
 import logger
@@ -47,7 +47,7 @@ def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
     datasets = os.listdir(config.OUTPUT_PATH)
 
     for uuid in datasets:
-        if uuid[0] != "." and uuid != "experiments":
+        if uuid[0] != "." and uuid != "experiments" and uuid != "models":
             path = os.path.join(config.OUTPUT_PATH, uuid)
             receipt_file = os.path.join(path, "receipt.json")
             with utils.ReceiptReader(filename=receipt_file) as receipt_reader:
