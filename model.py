@@ -1,13 +1,19 @@
 import argparse
 import os
+
+import matplotlib
 import numpy as np
+from matplotlib import pyplot as plt
+
 import config
 import logger
 import model
 
 from model import utils, models
 from preprocessor import preprocessor
-from plot_lib import plotter
+from plot_lib import plotter, interactive_plotter
+matplotlib.use('TkAgg')
+
 
 parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - MODEL', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
@@ -107,37 +113,43 @@ if __name__ == "__main__":
         metric_l.create_latent()
         latent_space, y_pred, y_true = metric_l.get_latent(), metric_l.get_y_pred(), metric_l.get_y_true()
 
-        if args.fit_new:
-            file_name = os.path.basename(args.fit_new).replace("_", " ")
-            logger.info(f"Fitting new song: {file_name}")
+        data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths())
+        title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+        ax, fig = interactive_plotter.interactive_gmm(gmm=metric_l.gaussian_model, data_points=data_points, title=title)
 
-            new_data = preprocessor.apply_signal(path=args.fit_new, segment_duration=15, signal_func=preprocessor.signal_processor.get_type(signal_processor))
-            new_data = [i.flatten() for i in new_data]
-            new_latent, new_y_pred = metric_l.fit_new(new_data)
+        plt.show()
 
-            # plot gaussian plot
-            path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}_{file_name}.pdf"
-            title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
-            plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, labels=y_pred, new_data=new_latent, new_label=file_name, logger=logger, title=title)
-
-            # get cluster stats for tree maps
-            path = f"{root}/tree_map_{args.n_clusters}_{args.genres}_{file_name}.pdf"
-            title = f"Treemap with {signal_processor} applied"
-            cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
-            plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
-
-            # getting recommendations
-            raw_paths = loader.get_associated_paths()
-            nearest_neighbours = utils.song_recommendation(latent_space=latent_space, raw_paths=raw_paths, points=new_latent, n_neighbours=3)
-            print(nearest_neighbours)
-        else:
-            # get cluster stats for tree maps
-            path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"
-            title = f"Treemap with {signal_processor} applied"
-            cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
-            plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
-
-            # plot gaussian plot
-            path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}.pdf"
-            title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
-            plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, logger=logger, labels=y_pred, title=title)
+        # if args.fit_new:
+        #     file_name = os.path.basename(args.fit_new).replace("_", " ")
+        #     logger.info(f"Fitting new song: {file_name}")
+        #
+        #     new_data = preprocessor.apply_signal(path=args.fit_new, segment_duration=15, signal_func=preprocessor.signal_processor.get_type(signal_processor))
+        #     new_data = [i.flatten() for i in new_data]
+        #     new_latent, new_y_pred = metric_l.fit_new(new_data)
+        #
+        #     # plot gaussian plot
+        #     path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}_{file_name}.pdf"
+        #     title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+        #     plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, labels=y_pred, new_data=new_latent, new_label=file_name, logger=logger, title=title)
+        #
+        #     # get cluster stats for tree maps
+        #     path = f"{root}/tree_map_{args.n_clusters}_{args.genres}_{file_name}.pdf"
+        #     title = f"Treemap with {signal_processor} applied"
+        #     cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+        #     plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
+        #
+        #     # getting recommendations
+        #     raw_paths = loader.get_associated_paths()
+        #     nearest_neighbours = utils.song_recommendation(latent_space=latent_space, raw_paths=raw_paths, points=new_latent, n_neighbours=3)
+        #     print(nearest_neighbours)
+        # else:
+        #     # get cluster stats for tree maps
+        #     path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"
+        #     title = f"Treemap with {signal_processor} applied"
+        #     cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+        #     plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
+        #
+        #     # plot gaussian plot
+        #     path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}.pdf"
+        #     title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+        #     plotter.plot_gmm(gmm=metric_l.gaussian_model, X=latent_space, path=path, logger=logger, labels=y_pred, title=title)

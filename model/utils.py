@@ -171,34 +171,34 @@ class Loader:
 
         return os.path.join(self.root, 'figures')
 
-def song_recommendation(latent_space: np.ndarray, raw_paths: list, points: np.ndarray, n_neighbours: int = 5, unique: bool = False) -> list[tuple]:
-    """
-    Finds the n nearest neighbours between 'points' and 'latent_space'
+class CustomPoint:
+    def __init__(self, point, nearest_neighbours, raw_path, y_pred, y_true):
+        self.point = point
+        self.x = point[0]
+        self.y = point[1]
+        self.nearest_neighbours = nearest_neighbours
+        self.y_pred = y_pred
+        self.y_true = y_true
+        self.raw_path = raw_path
 
-    :param unique: set to 'True' to stop different points from sharing the same nearest neighbours
-    :param latent_space: latent space points
-    :param raw_paths: the h5 files of the latent space points
-    :param points: new points to find n nearest neighbours
-    :param n_neighbours: n nearest neighbours
-
-    :return: array of tuples (float(point), [nearest neighbour raw paths])
-    """
+def find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours):
     nearest_neighbours = []
+    for i, latent_point in enumerate(latent_space):
+        path = os.path.basename(raw_paths[i])
+        dist = np.linalg.norm(point - latent_point)
+        info = (dist, latent_point, path)
 
-    for point in points:
-        dists = []
-        for i, latent_point in enumerate(latent_space):
-            path = os.path.basename(raw_paths[i])
-            dist = np.linalg.norm(point - latent_point)
-            info = (dist, latent_point, path)
+        nearest_neighbours.append(info)
 
-            if info in dists and not unique:
-                continue
-            else:
-                dists.append(info)
+    sorted_nearest_neighbours = sorted(nearest_neighbours, key=lambda x: x[0])[:n_neighbours+1]
 
-        sorted_dists = sorted(dists, key=lambda x: x[0])[::-1][:n_neighbours]
+    return sorted_nearest_neighbours
 
-        nearest_neighbours.append((point, sorted_dists))
+def create_custom_points(latent_space, raw_paths, y_pred, y_true, n_neighbours: int = 5):
+    custom_points = []
 
-    return nearest_neighbours
+    for i, point in enumerate(latent_space):
+        nearest_neighbours = find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours)
+        custom_points.append(CustomPoint(point, nearest_neighbours, raw_paths[i], y_pred[i], y_true[i]))
+
+    return custom_points

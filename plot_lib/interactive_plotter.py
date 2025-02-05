@@ -1,3 +1,6 @@
+from functools import partial
+
+from model.utils import CustomPoint
 from plot_lib import *
 
 def _draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
@@ -25,30 +28,21 @@ def _draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
     for nsig in range(1, 4):
         ax.add_patch(Ellipse(position, nsig * width, nsig * height, angle=angle, **kwargs))
 
-def plot_gmm(gmm, X, labels, title, ax=None,new_data=None, new_label=None) -> None:
+def interactive_gmm(gmm, data_points: list[CustomPoint], title) -> (plt.Axes, plt.Figure):
     """
     Plot Gaussian Mixture Model with ellipses around points.
-
-    :param new_label: the labels for the new song segments in 'new_data'
-    :param new_data: plots a song highlighted in a different colour
-    :param title: title
-    :param gmm: gaussian mixture model
-    :param X: data
-    :param labels: true labels
-    :param ax: ax to draw figure on
     """
+
+    x = [p.x for p in data_points]
+    y = [p.y for p in data_points]
+    labels = [p.y_pred for p in data_points]
+
     colours = [CMAP(i / (gmm.n_components - 1)) for i in range(gmm.n_components)]
     cmap = ListedColormap(colours)
 
-    ax = ax or plt.gca()
-    scatter = ax.scatter(X[:, 0], X[:, 1], c=labels, s=5, cmap=cmap, zorder=2)
+    fig, ax = plt.subplots()
+    scatter = ax.scatter(x, y, c=labels, s=5, cmap=cmap, zorder=2, picker=5)
     ax.axis('equal')
-
-    if new_data is not None:
-        ax.plot(new_data[:, 0], new_data[:, 1], c="purple", marker="o", linewidth=1, zorder=2, markersize=3, label=new_label)
-        ax.scatter(new_data[0][0], new_data[0][1], marker="^", linewidth=1, zorder=3, s=3, label="start")
-        ax.scatter(new_data[-1][0], new_data[-1][1], marker="s", linewidth=1, zorder=3, s=3, label="end")
-        ax.legend()
 
     w_factor = 0.2 / gmm.weights_.max()
     for pos, covar, w in zip(gmm.means_, gmm.covariances_, gmm.weights_):
@@ -62,3 +56,21 @@ def plot_gmm(gmm, X, labels, title, ax=None,new_data=None, new_label=None) -> No
     plt.title(title)
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
+
+    callback = partial(on_click, fig=fig, ax=ax, data_points=data_points)
+    fig.canvas.mpl_connect('pick_event', callback)
+
+    return ax, fig
+
+def on_click(event, fig, ax, data_points):
+    ind = event.ind
+    print("You clicked on point(s):", ind)
+    for i in ind:
+        for neighbour_data in data_points[i].nearest_neighbours:
+            point = list(neighbour_data)[1]
+            name = list(neighbour_data)[2]
+
+            ax.annotate(f"{name}", (point[0], point[1]), textcoords="offset points", xytext=(0,10), ha='center')
+            ax.plot([data_points[i].x, point[0]], [data_points[i].y, point[1]], color='black')
+
+    fig.canvas.draw()
