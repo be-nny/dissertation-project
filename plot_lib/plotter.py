@@ -1,19 +1,4 @@
-import matplotlib
-import numpy as np
-import pandas as pd
-import pypalettes
-import squarify
-from kneed import KneeLocator
-
-from matplotlib import pyplot as plt
-from matplotlib.colors import ListedColormap
-from matplotlib.patches import Ellipse
-from sklearn.cluster import KMeans
-
-matplotlib.use('TkAgg')
-
-colour_map_name = "hat"
-CMAP = pypalettes.load_cmap(colour_map_name)
+from plot_lib import *
 
 def plot_cluster_statistics(cluster_stats: dict, path: str, logger, title) -> None:
     """
@@ -84,8 +69,9 @@ def plot_2d_kmeans_boundaries(latent_space: np.ndarray, kmeans, logger, path: st
     """
 
     # colour map
-    colors = [CMAP(i / (kmeans.n_clusters - 1)) for i in range(kmeans.n_clusters)]
-    cmap = ListedColormap(colors)
+    colour_map = pypalettes.load_cmap("Benedictus")
+    colours = [colour_map(i / (kmeans.n_clusters - 1)) for i in range(kmeans.n_clusters)]
+    cmap = ListedColormap(colours)
 
     # plot the decision boundary
     x_min, x_max = latent_space[:, 0].min() - 1, latent_space[:, 0].max() + 1
@@ -132,7 +118,7 @@ def plot_eigenvalues(path, pca_model, logger, title) -> None:
 
     plt.plot([i for i in range(1, pca_model.n_components + 1)], pca_model.explained_variance_, marker="o", linestyle="-", label="Eigenvalues")
     plt.xlabel("Number of Components")
-    plt.ylabel("Eigenvalues (log)")
+    plt.ylabel("Explained Variance (log)")
     plt.yscale("log")
     plt.title(title)
     plt.savefig(path, bbox_inches='tight')
@@ -187,13 +173,15 @@ def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,
     :param loader: dataset loader
     :return: None
     """
-
     unique_labels = np.unique(y_true)
     str_labels = loader.decode_label(unique_labels)
 
+    colours = [CMAP(i / (len(unique_labels) - 1)) for i in range(len(unique_labels))]
+    cmap = ListedColormap(colours)
+
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111)
-    scatter = ax.scatter(latent_space[:, 0], latent_space[:, 1], c=y_true, cmap=CMAP, alpha=0.7, s=10)
+    scatter = ax.scatter(latent_space[:, 0], latent_space[:, 1], c=y_true, cmap=cmap, alpha=0.7, s=10)
     colour_bar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
     colour_bar.set_ticks(unique_labels)
     colour_bar.set_ticklabels(str_labels)
@@ -235,6 +223,9 @@ def plot_gmm(gmm, X, labels, path, logger, title, ax=None,new_data=None, new_lab
     """
     Plot Gaussian Mixture Model with ellipses around points.
 
+    :param new_label: the labels for the new song segments in 'new_data'
+    :param new_data: plots a song highlighted in a different colour
+    :param title: title
     :param gmm: gaussian mixture model
     :param X: data
     :param labels: true labels
@@ -242,8 +233,8 @@ def plot_gmm(gmm, X, labels, path, logger, title, ax=None,new_data=None, new_lab
     :param logger: logger
     :param ax: ax to draw figure on
     """
-    colors = [CMAP(i / (gmm.n_components - 1)) for i in range(gmm.n_components)]
-    cmap = ListedColormap(colors)
+    colours = [CMAP(i / (gmm.n_components - 1)) for i in range(gmm.n_components)]
+    cmap = ListedColormap(colours)
 
     ax = ax or plt.gca()
     scatter = ax.scatter(X[:, 0], X[:, 1], c=labels, s=5, cmap=cmap, zorder=2)
@@ -266,6 +257,8 @@ def plot_gmm(gmm, X, labels, path, logger, title, ax=None,new_data=None, new_lab
 
     plt.savefig(path, bbox_inches='tight')
     plt.title(title)
+    ax.set_xlabel("Axis 1")
+    ax.set_ylabel("Axis 2")
     logger.info(f"Saved plot '{path}'")
 
 def plot_inertia(latent_space, logger, path, title, max_clusters=20, n_genres=10) -> None:

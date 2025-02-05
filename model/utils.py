@@ -27,12 +27,33 @@ class ReceiptReader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         return
 
+
+def _normalise(signal_data: np.array) -> np.array:
+    """
+    Normalises the signals by subtracting the mean signal and dividing by the standard deviation. The mean signal
+    is a 2D array, and the standard deviation is a single scalar.
+
+    :param signal_data: signal data to be normalised (shape: [s,n,m])
+    :return: normalised signal of size (shape: [s,n,m])
+    """
+
+    std = np.std(signal_data)
+    mean = np.mean(signal_data, axis=0)
+
+    normalised_signal = (signal_data - mean) / std
+
+    return normalised_signal
+
+
 class Loader:
     def __init__(self, uuid: str, out: str, logger, batch_size: int = 512):
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
         self.logger = logger
         self.input_shape = None
+        self.dataloader = None
+        self.split_type = None
+        self.loaded_files = []
         self.batch_size = batch_size
         self.label_encoder = LabelEncoder()
 
@@ -64,6 +85,7 @@ class Loader:
         return split
 
     def load(self, split_type: str, normalise: bool = True, genre_filter: list = []):
+        self.split_type = split_type
         self.logger.info(f"'normalise' flag set to '{normalise}'")
         if split_type == "all":
             d1, l1 = self._get_data_split(split_type="test", normalise=normalise, genre_filter=genre_filter)
@@ -81,11 +103,11 @@ class Loader:
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
 
         dataset = TensorDataset(data_tensor, labels_tensor)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size)
+        self.dataloader = DataLoader(dataset, batch_size=self.batch_size)
 
         self.input_shape = np.array(data[0]).shape
 
-        return dataloader
+        return self.dataloader
 
     def encode_label(self, labels):
         return self.label_encoder.transform(labels)
@@ -123,6 +145,7 @@ class Loader:
                 genre = b_genre.decode("utf-8")
 
                 if genre in genre_filter or genre_filter == []:
+                    self.loaded_files.append(split[i])
                     signal = np.array(hdf_file["signal"])
                     signal = np.nan_to_num(signal, nan=111111, posinf=222222)
 
@@ -134,26 +157,12 @@ class Loader:
         signal_data = np.array(signal_data)
 
         if normalise:
-            signal_data = self._normalise(signal_data)
+            signal_data = _normalise(signal_data)
 
         return signal_data, genre_labels
 
-    @staticmethod
-    def _normalise(signal_data: np.array) -> np.array:
-        """
-        Normalises the signals by subtracting the mean signal and dividing by the standard deviation. The mean signal
-        is a 2D array, and the standard deviation is a single scalar.
-
-        :param signal_data: signal data to be normalised (shape: [s,n,m])
-        :return: normalised signal of size (shape: [s,n,m])
-        """
-
-        std = np.std(signal_data)
-        mean = np.mean(signal_data, axis=0)
-
-        normalised_signal = (signal_data - mean) / std
-
-        return normalised_signal
+    def get_associated_paths(self):
+        return self.loaded_files
 
     def get_figures_path(self):
         """
@@ -161,3 +170,35 @@ class Loader:
         """
 
         return os.path.join(self.root, 'figures')
+
+def song_recommendation(latent_space: np.ndarray, raw_paths: list, points: np.ndarray, n_neighbours: int = 5, unique: bool = False) -> list[tuple]:
+    """
+    Finds the n nearest neighbours between 'points' and 'latent_space'
+
+    :param unique: set to 'True' to stop different points from sharing the same nearest neighbours
+    :param latent_space: latent space points
+    :param raw_paths: the h5 files of the latent space points
+    :param points: new points to find n nearest neighbours
+    :param n_neighbours: n nearest neighbours
+
+    :return: array of tuples (float(point), [nearest neighbour raw paths])
+    """
+    nearest_neighbours = []
+
+    for point in points:
+        dists = []
+        for i, latent_point in enumerate(latent_space):
+            path = os.path.basename(raw_paths[i])
+            dist = np.linalg.norm(point - latent_point)
+            info = (dist, latent_point, path)
+
+            if info in dists and not unique:
+                continue
+            else:
+                dists.append(info)
+
+        sorted_dists = sorted(dists, key=lambda x: x[0])[::-1][:n_neighbours]
+
+        nearest_neighbours.append((point, sorted_dists))
+
+    return nearest_neighbours

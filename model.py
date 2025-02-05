@@ -96,6 +96,7 @@ if __name__ == "__main__":
             os.makedirs(root)
 
         logger.info("Running Model")
+
         # create a dataloader
         _, genre_filter = get_genre_filter(args.genres)
         loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
@@ -125,6 +126,10 @@ if __name__ == "__main__":
             cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
             plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
 
+            # getting recommendations
+            raw_paths = loader.get_associated_paths()
+            nearest_neighbours = utils.song_recommendation(latent_space=latent_space, raw_paths=raw_paths, points=new_latent, n_neighbours=3)
+            print(nearest_neighbours)
         else:
             # get cluster stats for tree maps
             path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"

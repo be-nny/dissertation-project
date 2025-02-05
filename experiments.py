@@ -24,7 +24,6 @@ parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS',
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-n", "--nmi", type=str, help="Plots NMI score against the number of UMAP or PCA components. Set flag to 'pca' or 'umap'")
 parser.add_argument("-e", "--eigen", type=int, help="Plots the eigenvalues obtained after performing PCA. Takes value for max n_components")
 parser.add_argument("-b", "--boundaries", help="Plots 2D Kmeans Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
 parser.add_argument("-s", "--gaussian", help="Plots 2D Gaussian Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
