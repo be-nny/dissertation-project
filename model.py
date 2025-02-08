@@ -113,10 +113,17 @@ if __name__ == "__main__":
         metric_l.create_latent()
         latent_space, y_pred, y_true = metric_l.get_latent(), metric_l.get_y_pred(), metric_l.get_y_true()
 
-        data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths())
-        title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
-        ax, fig = interactive_plotter.interactive_gmm(gmm=metric_l.gaussian_model, data_points=data_points, title=title)
+        # get cluster stats for tree maps
+        path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"
+        title = f"Treemap with {signal_processor} applied"
+        cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+        plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger, title=title)
 
+        # show window
+        data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=metric_l.gaussian_model.gmm.covariances_)
+        path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}.pdf"
+        title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+        ax, fig = interactive_plotter.interactive_gmm(gmm=metric_l.gaussian_model, data_points=data_points, title=title, path=path)
         plt.show()
 
         # if args.fit_new:

@@ -28,7 +28,7 @@ def _draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
     for nsig in range(1, 4):
         ax.add_patch(Ellipse(position, nsig * width, nsig * height, angle=angle, **kwargs))
 
-def interactive_gmm(gmm, data_points: list[CustomPoint], title) -> (plt.Axes, plt.Figure):
+def interactive_gmm(gmm, data_points: list[CustomPoint], title, path) -> (plt.Axes, plt.Figure):
     """
     Plot Gaussian Mixture Model with ellipses around points.
     """
@@ -41,7 +41,7 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title) -> (plt.Axes, pl
     cmap = ListedColormap(colours)
 
     fig, ax = plt.subplots()
-    scatter = ax.scatter(x, y, c=labels, s=5, cmap=cmap, zorder=2, picker=5)
+    scatter = ax.scatter(x, y, c=labels, s=10, cmap=cmap, zorder=2, picker=5)
     ax.axis('equal')
 
     w_factor = 0.2 / gmm.weights_.max()
@@ -59,7 +59,7 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title) -> (plt.Axes, pl
 
     callback = partial(on_click, fig=fig, ax=ax, data_points=data_points)
     fig.canvas.mpl_connect('pick_event', callback)
-
+    plt.savefig(path)
     return ax, fig
 
 def on_click(event, fig, ax, data_points):
@@ -70,7 +70,7 @@ def on_click(event, fig, ax, data_points):
             point = list(neighbour_data)[1]
             name = list(neighbour_data)[2]
 
-            ax.annotate(f"{name}", (point[0], point[1]), textcoords="offset points", xytext=(0,10), ha='center')
+            ax.annotate(f"{name}", (point[0], point[1]), textcoords="offset points", xytext=(0,5), ha='center')
             ax.plot([data_points[i].x, point[0]], [data_points[i].y, point[1]], color='black')
 
     fig.canvas.draw()

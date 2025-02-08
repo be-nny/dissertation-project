@@ -6,6 +6,7 @@ from tqdm import tqdm
 import torch
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
+from scipy.spatial.distance import mahalanobis
 
 class ReceiptReader:
     def __init__(self, filename):
@@ -172,6 +173,9 @@ class Loader:
         return os.path.join(self.root, 'figures')
 
 class CustomPoint:
+    """
+    Store additional information for interactive plot
+    """
     def __init__(self, point, nearest_neighbours, raw_path, y_pred, y_true):
         self.point = point
         self.x = point[0]
@@ -181,11 +185,22 @@ class CustomPoint:
         self.y_true = y_true
         self.raw_path = raw_path
 
-def find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours):
+def find_nearest_neighbours(latent_space: np.ndarray, raw_paths: list[str], point, n_neighbours: int, covar: np.ndarray) -> list:
+    """
+    Uses mahalanobis distance to find the nearest neighbours to a point on the latent space.
+
+    :param latent_space: the latent space
+    :param raw_paths: the raw .mp3/.wav paths of the original audio
+    :param point: a 'CustomPoint' point
+    :param n_neighbours: the number of nearest neighbours
+    :param covar: covariance matrix
+    :return: a list of n nearest neighbours (ascending order)
+    """
+
     nearest_neighbours = []
     for i, latent_point in enumerate(latent_space):
         path = os.path.basename(raw_paths[i])
-        dist = np.linalg.norm(point - latent_point)
+        dist = mahalanobis(point, latent_point, covar)
         info = (dist, latent_point, path)
 
         nearest_neighbours.append(info)
@@ -194,11 +209,22 @@ def find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours):
 
     return sorted_nearest_neighbours
 
-def create_custom_points(latent_space, raw_paths, y_pred, y_true, n_neighbours: int = 5):
+def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred: np.ndarray, y_true: np.ndarray, covar: np.ndarray, n_neighbours: int = 5) -> list[CustomPoint]:
+    """
+    Creates a list of 'CustomPoints' to store additional infor about the data points before plotting them.
+
+    :param latent_space: the latent space
+    :param raw_paths: the raw .mp3/.wav paths of the original audio
+    :param y_pred: predicted labels
+    :param y_true: true labels
+    :param covar: a list of covariance matrices
+    :param n_neighbours: the number of nearest neighbours
+    :return: a list of 'CustomPoints'
+    """
     custom_points = []
 
     for i, point in enumerate(latent_space):
-        nearest_neighbours = find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours)
+        nearest_neighbours = find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours, covar[i])
         custom_points.append(CustomPoint(point, nearest_neighbours, raw_paths[i], y_pred[i], y_true[i]))
 
     return custom_points
