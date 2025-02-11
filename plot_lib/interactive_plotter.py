@@ -64,7 +64,6 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title, path) -> (plt.Ax
 
 def on_click(event, fig, ax, data_points):
     ind = event.ind
-    print("You clicked on point(s):", ind)
     for i in ind:
         for neighbour_data in data_points[i].nearest_neighbours:
             point = list(neighbour_data)[1]

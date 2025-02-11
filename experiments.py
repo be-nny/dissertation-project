@@ -2,18 +2,15 @@ import os
 import argparse
 import os.path
 import umap.umap_ as umap
-
-from experimental_models import conv_autoencoder
-from plot_lib.plotter import *
+from sklearn.manifold import TSNE
 
 import config
 import logger
 
+from plot_lib.plotter import *
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
-
-import model.utils
 from model import utils
 
 matplotlib.use('TkAgg')
@@ -23,6 +20,9 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
+parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters")
+parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
+
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
 parser.add_argument("-e", "--eigen", type=int, help="Plots the eigenvalues obtained after performing PCA. Takes value for max n_components")
 parser.add_argument("-b", "--boundaries", help="Plots 2D Kmeans Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
@@ -30,9 +30,6 @@ parser.add_argument("-s", "--gaussian", help="Plots 2D Gaussian Boundaries of UM
 parser.add_argument("-t", "--inertia", help="Plots number of clusters against kmeans inertia score for UMAP or PCA. '-g' must also be set. '-nc' must be set for the max. number of clusters")
 parser.add_argument("-v2", "--visualise2d", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
 parser.add_argument("-v3", "--visualise3d", help="Plots 3D Latent Space of UMAP or PCA. '-g' must also be set.")
-parser.add_argument("-o", "--conv", action="store_true", help="Train convolutional autoencoder. '-g' must also be set.")
-parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters")
-parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 
 BATCH_SIZE = 512
 
@@ -54,31 +51,6 @@ def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
 
             logger.info(out_str)
 
-def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: model.utils.Loader) -> dict:
-    """
-    Creates a dictionary containing which clusters have what genre in them. Each genre has a count of the number of samples in that cluster with that genre tag
-
-    :param y_true: true label values
-    :param y_pred: predicted label values
-    :param loader: dataset loader
-    :return: the cluster statistics
-    """
-
-    cluster_stats = {}
-
-    # convert the encoded labels back to strings
-    y_true = loader.decode_label(y_true)
-    for i in range(0, len(y_pred)):
-        if y_pred[i] not in cluster_stats:
-            cluster_stats.update({y_pred[i]: {}})
-
-        if y_true[i] not in cluster_stats[y_pred[i]]:
-            cluster_stats[y_pred[i]].update({y_true[i]: 0})
-
-        cluster_stats[y_pred[i]][y_true[i]] += 1
-
-    return cluster_stats
-
 def load_flatten(batch_loader):
     flattened_data = []
     flattened_y_true = []
@@ -88,7 +60,7 @@ def load_flatten(batch_loader):
         flattened_data.extend(flattened)
         flattened_y_true.extend(y)
 
-    return flattened_data, flattened_y_true
+    return np.array(flattened_data), np.array(flattened_y_true)
 
 def get_dim_model(model_type):
     seed = 42
@@ -96,6 +68,10 @@ def get_dim_model(model_type):
         return PCA(n_components=2, random_state=seed)
     elif model_type == "umap":
         return umap.UMAP(n_components=2, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=seed)
+    elif model_type == "tsne":
+        return TSNE(n_components=2, random_state=seed)
+    else:
+        raise TypeError("Model type must be 'pca' or 'umap' or 'tsne'")
 
 def get_genre_filter(genres_arg):
     if genres_arg != "all":
@@ -166,10 +142,9 @@ if __name__ == "__main__":
             title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
             plot_gmm(gmm=gmm, X=latent_data, labels=y_pred, path=path1, logger=logger, title=title)
 
-            stats = cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
+            stats = utils.cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader, logger=logger)
             path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.gaussian.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
-            title = f"Treemap with {signal_processor} applied"
-            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger, title=title)
+            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger)
 
         if args.boundaries:
             # use pca or umap
@@ -196,10 +171,9 @@ if __name__ == "__main__":
             plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, logger=logger, path=path1, genre_filter=args.genres, title=title)
 
             # plot genre spread
-            stats = cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
+            stats = utils.cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
             path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
-            title = f"Treemap with {signal_processor} applied"
-            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger, title=title)
+            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger)
 
         if args.inertia:
             experiments_dir = os.path.join(experiments_dir_root, "kmeans-inertia-plots")
@@ -259,19 +233,3 @@ if __name__ == "__main__":
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise3d.lower()}_{args.genres}_visualisation_3D.pdf")
             title = f"Latent Space in 3D with {signal_processor} applied using {args.visualise2d.lower()}"
             plot_3D(latent_space=latent, y_true=np.array(y_true), logger=logger, path=path, genre_filter=args.genres, loader=loader, title=title)
-
-        if args.conv:
-            experiments_dir = os.path.join(experiments_dir_root, "convolutional_ae")
-            if not os.path.exists(experiments_dir):
-                os.mkdir(experiments_dir)
-
-            _, genre_filter = get_genre_filter(args.genres)
-            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            batch_loader = loader.load(split_type="train", normalise=True, genre_filter=genre_filter)
-
-            conv_ae = conv_autoencoder.ConvAutoencoder(latent_dim=2, n_layers=[128, 64, 32, 16], input_shape=loader.input_shape, loader=batch_loader, logger=logger, uuid=args.uuid, figures_path=experiments_dir)
-            conv_ae.train_autoencoder(epochs=250)
-
-            # dec_model = deep_clustering.DeepClustering(latent_dims=2, n_clusters=10, convolutional_ae=conv_ae, loader=batch_loader, logger=logger, figures_path=experiments_dir, uuid=args.uuid)
-            # dec_model.train(epochs=500)
-

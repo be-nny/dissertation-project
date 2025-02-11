@@ -1,6 +1,6 @@
 from plot_lib import *
 
-def plot_cluster_statistics(cluster_stats: dict, path: str, logger, title) -> None:
+def plot_cluster_statistics(cluster_stats: dict, path: str, logger) -> None:
     """
     Creates a figure with a set of pie chart subplots demonstrating which clusters have what genre in them.
 
@@ -51,7 +51,6 @@ def plot_cluster_statistics(cluster_stats: dict, path: str, logger, title) -> No
         axes[j].set_visible(False)
 
     plt.tight_layout()
-    plt.title(title)
     plt.savefig(path, bbox_inches='tight')
     logger.info(f"Saved plot '{path}'")
 
@@ -255,10 +254,10 @@ def plot_gmm(gmm, X, labels, path, logger, title, ax=None,new_data=None, new_lab
     colorbar.set_ticks(np.arange(gmm.n_components))
     colorbar.set_ticklabels([f"Cluster {i}" for i in range(gmm.n_components)])
 
-    plt.savefig(path, bbox_inches='tight')
     plt.title(title)
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
+    plt.savefig(path, bbox_inches='tight')
     logger.info(f"Saved plot '{path}'")
 
 def plot_inertia(latent_space, logger, path, title, max_clusters=20, n_genres=10) -> None:

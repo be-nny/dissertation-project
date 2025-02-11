@@ -1,6 +1,9 @@
 import numpy as np
 import umap.umap_ as umap
+import torch
 from sklearn.mixture import GaussianMixture
+from torch import nn
+from tqdm import tqdm
 
 LATENT_DIMS = 2
 SEED = 42
@@ -17,33 +20,24 @@ class MetricLearner:
         self.y_pred = None
         self.latent_data = None
 
-    def _load_flatten(self):
-        """
-        Uses the data loader to load and flatten the data ready for input into UMAP.
-
-        :return: flattened input data, flattened true labels
-        """
-
-        flattened_data = []
-        flattened_y_true = []
-        for x, y in self.loader:
-            x = x.numpy()
-            flattened = [i.flatten() for i in x]
-            flattened_data.extend(flattened)
-            flattened_y_true.extend(y)
-
-        return flattened_data, flattened_y_true
-
     def create_latent(self):
         """
         Creates a latent representation by transforming the data using UMAP, and then applying a Gaussian Mixture Model
         to the data to cluster the latent points.
         """
 
-        data, self.y_true = self._load_flatten()
+        data = []
+        self.y_true = []
+        for x, y in self.loader:
+            x = x.numpy()
+            data.extend(x)
+            self.y_true.extend(y)
 
         self.latent_data = self.umap_model.fit_transform(data).astype(np.float64)
         self.y_pred = self.gaussian_model.fit_predict(self.latent_data)
+
+        # delete this data to free up memory
+        del data
 
         return self
 
@@ -78,10 +72,60 @@ class MetricLearner:
         """
         return self.y_true
 
+class GenreClassifier(nn.Module):
+    def __init__(self, input_dims: int, hidden_dims: list, output_dims: int):
+        dims = [input_dims, *hidden_dims, output_dims]
 
+        self.network = []
+        for i in range(0, len(dims)-1):
+            self.network.extend([nn.Linear(dims[i], dims[i+1]), nn.Sigmoid()])
+        self.network.append(nn.LogSoftmax(dim=1))
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    def forward(self, x):
+        """
+        Feed forward through the network
 
+        :param x: input tensor
+        :return: the output of the network
+        """
+
+        for f in self.network:
+            x = f(x)
+        return x
+
+def train_genre_classifier(model: GenreClassifier, n_epochs: int, loader, lr: float = 0.1):
+    """
+    Trains a multi-classifier to classify genres.
+
+    :param model: genre classifier
+    :param n_epochs: number of epochs
+    :param loader: dataset loader
+    """
+
+    model.train()
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    losses = []
+    tqdm_loop = tqdm(range(n_epochs), desc="Training Genre Classifier", unit="epoch")
+    for _ in tqdm_loop:
+        epoch_loss = 0
+        for x, y in loader:
+            optimizer.zero_grad()
+            x = x.to(model.device)
+
+            y_hat_log = model(x)
+            loss = criterion(y_hat_log, y)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        avg_loss = epoch_loss / len(loader)
+        losses.append(avg_loss)
+        tqdm_loop.set_description(f"Training Genre Classifier - avg_loss:{avg_loss}")
 
 
 

@@ -259,8 +259,6 @@ def apply_signal(path: str, signal_func, segment_duration, target_length=None) -
             # generate the desired audio spectrogram
             raw_signal = signal_func(segment, sr)
 
-            # remove any NaN values
-
             # properly discard the layers arr
             data.append(raw_signal)
 

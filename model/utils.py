@@ -2,6 +2,7 @@ import json
 import os
 import h5py
 import numpy as np
+from sklearn.metrics import normalized_mutual_info_score
 from tqdm import tqdm
 import torch
 from sklearn.preprocessing import LabelEncoder
@@ -85,9 +86,11 @@ class Loader:
         np.random.shuffle(split)
         return split
 
-    def load(self, split_type: str, normalise: bool = True, genre_filter: list = []):
+    def load(self, split_type: str, normalise: bool = True, genre_filter: list = [], flatten: bool = False):
         self.split_type = split_type
         self.logger.info(f"'normalise' flag set to '{normalise}'")
+        self.logger.info(f"'flatten' flag set to '{flatten}'")
+
         if split_type == "all":
             d1, l1 = self._get_data_split(split_type="test", normalise=normalise, genre_filter=genre_filter)
             d2, l2 = self._get_data_split(split_type="train", normalise=normalise, genre_filter=genre_filter)
@@ -98,16 +101,19 @@ class Loader:
 
         data = np.array(data)
 
+        if flatten:
+            data = [d.flatten() for d in data]
+
         int_labels = self.label_encoder.fit_transform(labels)
 
-        data_tensor = torch.tensor(data, dtype=torch.float32)
+        data_tensor = torch.tensor(np.array(data), dtype=torch.float32)
         labels_tensor = torch.tensor(int_labels, dtype=torch.int64)
 
         dataset = TensorDataset(data_tensor, labels_tensor)
         self.dataloader = DataLoader(dataset, batch_size=self.batch_size)
 
         self.input_shape = np.array(data[0]).shape
-
+        del data
         return self.dataloader
 
     def encode_label(self, labels):
@@ -224,7 +230,34 @@ def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred:
     custom_points = []
 
     for i, point in enumerate(latent_space):
-        nearest_neighbours = find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours, covar[i])
+        nearest_neighbours = find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours, covar)
         custom_points.append(CustomPoint(point, nearest_neighbours, raw_paths[i], y_pred[i], y_true[i]))
 
     return custom_points
+
+def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader, logger) -> dict:
+    """
+    Creates a dictionary containing which clusters have what genre in them. Each genre has a count of the number of samples in that cluster with that genre tag
+
+    :param y_true: true label values
+    :param y_pred: predicted label values
+    :param loader: dataset loader
+    :return: the cluster statistics
+    """
+    # nmi score
+    nmi = normalized_mutual_info_score(y_true, y_pred)
+    logger.info(f"NMI score: {nmi}")
+
+    cluster_stats = {}
+    # convert the encoded labels back to strings
+    y_true = loader.decode_label(y_true)
+    for i in range(0, len(y_pred)):
+        if y_pred[i] not in cluster_stats:
+            cluster_stats.update({y_pred[i]: {}})
+
+        if y_true[i] not in cluster_stats[y_pred[i]]:
+            cluster_stats[y_pred[i]].update({y_true[i]: 0})
+
+        cluster_stats[y_pred[i]][y_true[i]] += 1
+
+    return cluster_stats
