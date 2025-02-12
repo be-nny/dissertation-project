@@ -188,7 +188,7 @@ def train_genre_classifier(model: GenreClassifier, n_epochs: int, loader, lr: fl
     """
 
     model.train()
-
+    model.to(model.device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -199,6 +199,7 @@ def train_genre_classifier(model: GenreClassifier, n_epochs: int, loader, lr: fl
         for x, y in loader:
             optimizer.zero_grad()
             x = x.to(model.device)
+            y = y.to(model.device)
 
             y_hat_log = model(x)
             loss = criterion(y_hat_log, y)
