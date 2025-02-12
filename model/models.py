@@ -1,6 +1,8 @@
 import numpy as np
 import umap.umap_ as umap
 import torch
+from scipy.cluster.hierarchy import linkage
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.mixture import GaussianMixture
 from torch import nn
 from tqdm import tqdm
@@ -8,7 +10,56 @@ from tqdm import tqdm
 LATENT_DIMS = 2
 SEED = 42
 
-class MetricLearner:
+class HierarchicalClustering:
+    def __init__(self, loader, n_clusters: int = None):
+        self.loader = loader
+        self.umap_model = umap.UMAP(n_components=LATENT_DIMS, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
+        self.agglomerative = AgglomerativeClustering(distance_threshold=0, n_clusters=n_clusters)
+
+        self.y_true = None
+        self.y_pred = None
+        self.latent_data = None
+
+    def create_latent(self):
+        """
+        Creates a latent representation by transforming the data using UMAP, and then applying a Gaussian Mixture Model
+        to the data to cluster the latent points.
+        """
+
+        tmp = []
+        self.y_true = []
+        for x, y in self.loader:
+            x = x.numpy()
+            tmp.extend(x)
+            self.y_true.extend(y)
+
+        self.latent_data = self.umap_model.fit_transform(tmp).astype(np.float64)
+        self.y_pred = self.agglomerative.fit_predict(self.latent_data)
+
+        # delete this data to free up memory
+        del tmp
+
+        return self
+
+    def get_latent(self):
+        """
+        :return: the latent representation of the data
+        """
+        return self.latent_data
+
+    def get_y_pred(self):
+        """
+        :return: the predicted labels
+        """
+        return self.y_pred
+
+    def get_y_true(self):
+        """
+        :return: the true labels
+        """
+        return self.y_true
+
+class GMMLearner:
     def __init__(self, loader, n_clusters):
         self.n_clusters = n_clusters
         self.loader = loader
@@ -26,18 +77,18 @@ class MetricLearner:
         to the data to cluster the latent points.
         """
 
-        data = []
+        tmp = []
         self.y_true = []
         for x, y in self.loader:
             x = x.numpy()
-            data.extend(x)
+            tmp.extend(x)
             self.y_true.extend(y)
 
-        self.latent_data = self.umap_model.fit_transform(data).astype(np.float64)
+        self.latent_data = self.umap_model.fit_transform(tmp).astype(np.float64)
         self.y_pred = self.gaussian_model.fit_predict(self.latent_data)
 
         # delete this data to free up memory
-        del data
+        del tmp
 
         return self
 
@@ -72,30 +123,62 @@ class MetricLearner:
         """
         return self.y_true
 
+
 class GenreClassifier(nn.Module):
-    def __init__(self, input_dims: int, hidden_dims: list, output_dims: int):
-        dims = [input_dims, *hidden_dims, output_dims]
-
-        self.network = []
-        for i in range(0, len(dims)-1):
-            self.network.extend([nn.Linear(dims[i], dims[i+1]), nn.Sigmoid()])
-        self.network.append(nn.LogSoftmax(dim=1))
-
+    def __init__(self, n_classes):
+        super().__init__()
+        k_s = 3
+        s = 2
+        p = 1
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.network = nn.Sequential(
+            nn.Conv1d(256, 128, kernel_size=k_s, stride=s, padding=p),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(kernel_size=k_s, stride=s, padding=p),
+
+            nn.Conv1d(128, 64, kernel_size=k_s, stride=s, padding=p),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(kernel_size=k_s, stride=s, padding=p),
+
+            nn.Conv1d(64, 32, kernel_size=k_s, stride=s, padding=p),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(kernel_size=k_s, stride=s, padding=p),
+
+            nn.Conv1d(32, 16, kernel_size=k_s, stride=s, padding=p),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(kernel_size=k_s, stride=s, padding=p),
+
+            nn.Conv1d(16, 8, kernel_size=k_s, stride=s, padding=p),
+            nn.LeakyReLU(),
+            nn.MaxPool1d(kernel_size=k_s, stride=s, padding=p),
+
+            nn.AdaptiveAvgPool1d(1),
+        )
+
+        self.flatten = nn.Flatten()
+
+        # calculate the correct input size for the fully connected layer
+        with torch.no_grad():
+            dummy_input = torch.randn(1, 256, 256)
+            output_shape = self.network(dummy_input).shape
+            fc_input_dim = output_shape[1] * output_shape[2]
+
+        self.fc = nn.Sequential(
+            nn.Linear(fc_input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, n_classes),
+            nn.Softmax(dim=1)
+        )
+
     def forward(self, x):
-        """
-        Feed forward through the network
+        x = self.network(x)
+        x = self.flatten(x)
+        x = self.fc(x)
 
-        :param x: input tensor
-        :return: the output of the network
-        """
-
-        for f in self.network:
-            x = f(x)
         return x
 
-def train_genre_classifier(model: GenreClassifier, n_epochs: int, loader, lr: float = 0.1):
+def train_genre_classifier(model: GenreClassifier, n_epochs: int, loader, lr: float = 0.0001):
     """
     Trains a multi-classifier to classify genres.
 

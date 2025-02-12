@@ -8,13 +8,12 @@ import numpy as np
 import config
 import logger
 import model
-import preprocessor.signal_processor
 
 from matplotlib import pyplot as plt
 
 from model import utils, models
 from plot_lib import plotter, interactive_plotter
-from preprocessor import signal_processor, preprocessor
+from preprocessor import preprocessor as p, signal_processor as sp
 
 matplotlib.use('TkAgg')
 
@@ -23,7 +22,7 @@ parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
 parser.add_argument("-r", "--run", help="Runs the model")
-parser.add_argument("-f", "--fit_new", help="Fit a new song. '-r' must be called first")
+parser.add_argument("-f", "--fit_new_song", help="Fit a new song. '-r' must be called first")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 parser.add_argument("-n", "--n_clusters", type=int, help="The number of clusters to find")
 
@@ -88,15 +87,16 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: model.uti
 
     return cluster_stats
 
-def fit_new(path: str, sr, model: models.MetricLearner, signal_func_name: str, segment_duration: int, fig: plt.Figure, ax: plt.Axes):
+def fit_new(path: str, model: models.GMMLearner, signal_func_name: str, segment_duration: int, fig: plt.Figure, ax: plt.Axes):
     file_name = os.path.basename(path)
+    _, sr = librosa.load(path, sr=None)
 
     offset = 5
     offset_sr = offset * sr
     segment_duration_sr = segment_duration * sr
 
-    signal_func = preprocessor.signal_processor.get_type(signal_func_name)
-    segment_data = preprocessor.preprocessor.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration)
+    signal_func = sp.get_type(signal_func_name)
+    segment_data = p.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration)
     strides = np.lib.stride_tricks.as_strided(segment_data, (len(segment_data) - segment_duration_sr + offset_sr, segment_duration_sr), 2 * segment_data.strides)
     flattened_strides = [segment.flatten() for segment in strides]
 
@@ -115,6 +115,32 @@ if __name__ == "__main__":
     if args.info:
         show_info(logger, config)
 
+    if args.run == "agglomerative":
+        with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
+            signal_processor = receipt.signal_processor
+
+        root = f"{config.OUTPUT_PATH}/models/metric_learning/{args.uuid}"
+        if not os.path.exists(root):
+            os.makedirs(root)
+
+        logger.info("Running Model: Agglomerative Clustering")
+
+        # create a dataloader
+        _, genre_filter = get_genre_filter(args.genres)
+        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
+        batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
+
+        # create metric learner
+        agg = models.HierarchicalClustering(loader=batch_loader)
+        agg.create_latent()
+
+        # plot dendrogram
+        plt.title("Agglomerative Clustering Dendrogram")
+        raw_labels = loader.get_associated_paths()
+        plotter.plot_dendrogram(agg.agglomerative, labels=raw_labels, truncate_mode="level")
+        plt.xlabel("Number of points in node (or index of point if no parenthesis).")
+        plt.show()
+
     if args.run == "metric_learning":
         with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
             signal_processor = receipt.signal_processor
@@ -132,7 +158,7 @@ if __name__ == "__main__":
         batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
         # create metric learner
-        metric_l = models.MetricLearner(loader=batch_loader, n_clusters=args.n_clusters)
+        metric_l = models.GMMLearner(loader=batch_loader, n_clusters=args.n_clusters)
         metric_l.create_latent()
         latent_space, y_pred, y_true = metric_l.get_latent(), metric_l.get_y_pred(), metric_l.get_y_true()
 
@@ -149,9 +175,8 @@ if __name__ == "__main__":
         title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
         ax, fig = interactive_plotter.interactive_gmm(gmm=metric_l.gaussian_model, data_points=data_points, title=title, path=path)
 
-        if args.fit_new:
-            _, sr = librosa.load(path, sr=None)
-            ax, fig = fit_new(path=args.fit_new, sr=sr, model=metric_l, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
+        if args.fit_new_song:
+            ax, fig = fit_new(path=args.fit_new_song, model=metric_l, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
 
         plt.show()
 
@@ -167,8 +192,8 @@ if __name__ == "__main__":
 
         # create a dataloader
         _, genre_filter = get_genre_filter(args.genres)
-        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
-        batch_loader = loader.load(split_type="train", normalise=True, genre_filter=genre_filter, flatten=True)
+        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=16)
+        batch_loader = loader.load(split_type="train", normalise=True, genre_filter=genre_filter)
         input_dims = int(loader.input_shape[0])
-        multi_classifier = models.GenreClassifier(input_dims=input_dims, hidden_dims=[input_dims*2, input_dims*2], output_dims=len(genre_filter))
+        multi_classifier = models.GenreClassifier(n_classes=10)
         models.train_genre_classifier(model=multi_classifier, loader=batch_loader, n_epochs=500)
