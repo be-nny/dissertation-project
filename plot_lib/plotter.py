@@ -241,7 +241,7 @@ def draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
     for nsig in range(1, 4):
         ax.add_patch(Ellipse(position, nsig * width, nsig * height, angle=angle, **kwargs))
 
-def plot_gmm(gmm, X, labels, path, logger, title, ax=None,new_data=None, new_label=None) -> None:
+def plot_gmm(gmm, X, labels, path, logger, title, ax=None) -> None:
     """
     Plot Gaussian Mixture Model with ellipses around points.
 
@@ -261,12 +261,6 @@ def plot_gmm(gmm, X, labels, path, logger, title, ax=None,new_data=None, new_lab
     ax = ax or plt.gca()
     scatter = ax.scatter(X[:, 0], X[:, 1], c=labels, s=5, cmap=cmap, zorder=2)
     ax.axis('equal')
-
-    if new_data is not None:
-        ax.plot(new_data[:, 0], new_data[:, 1], c="purple", marker="o", linewidth=1, zorder=2, markersize=3, label=new_label)
-        ax.scatter(new_data[0][0], new_data[0][1], marker="^", linewidth=1, zorder=3, s=3, label="start")
-        ax.scatter(new_data[-1][0], new_data[-1][1], marker="s", linewidth=1, zorder=3, s=3, label="end")
-        ax.legend()
 
     w_factor = 0.2 / gmm.weights_.max()
     for pos, covar, w in zip(gmm.means_, gmm.covariances_, gmm.weights_):

@@ -1,13 +1,12 @@
 import os
-
 import matplotlib
 import numpy as np
 import torch
+
 from matplotlib import pyplot as plt
 from torch import nn
 from torch.optim import lr_scheduler
 from tqdm import tqdm
-from plot_lib import plotter
 matplotlib.use('TkAgg')
 
 def _target_distribution(assignments):
@@ -16,6 +15,7 @@ def _target_distribution(assignments):
     :param assignments: soft assignments
     :return: target distribution (num_samples, num_clusters)
     """
+
     targets = assignments.pow(2) / (assignments.sum(dim=0, keepdim=True) + 1e-6)
     targets = targets / targets.sum(dim=1, keepdim=True)
     return targets
@@ -48,6 +48,7 @@ class _DEC(nn.Module):
         :param latent_space: latent_space
         :return: soft assignments (num_samples, num_clusters)
         """
+
         q = 1.0 / (1.0 + torch.sum(torch.pow(latent_space.unsqueeze(1) - self.clustering_layer, 2), 2) / self.alpha)
         q = q.pow((self.alpha + 1.0) / 2.0)
         q = (q.t() / torch.sum(q, 1)).t()

@@ -88,21 +88,26 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: model.uti
     return cluster_stats
 
 def fit_new(path: str, model: models.GMMLearner, signal_func_name: str, segment_duration: int, fig: plt.Figure, ax: plt.Axes):
-    file_name = os.path.basename(path)
-    _, sr = librosa.load(path, sr=None)
-
-    offset = 5
-    offset_sr = offset * sr
-    segment_duration_sr = segment_duration * sr
+    file_name = os.path.basename(path).strip().replace("_", " ")
 
     signal_func = sp.get_type(signal_func_name)
     segment_data = p.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration)
-    strides = np.lib.stride_tricks.as_strided(segment_data, (len(segment_data) - segment_duration_sr + offset_sr, segment_duration_sr), 2 * segment_data.strides)
-    flattened_strides = [segment.flatten() for segment in strides]
 
-    new_fitted = model.fit_new(flattened_strides)
+    stride = int(segment_data.shape[-1] * (15/30))
+    window_size = int(segment_data.shape[-1] * 2)
 
-    ax.plot(new_fitted[:, 0], new_fitted[:, 1], 'o', color="red", label=file_name)
+    merged_signals = np.concatenate(segment_data, axis=-1)
+    out_shape = ((merged_signals.shape[1] - window_size) // stride + 1, merged_signals.shape[0], window_size)
+    strides = (merged_signals.strides[1] * stride, merged_signals.strides[0], merged_signals.strides[1])
+    overlapping_reg = np.lib.stride_tricks.as_strided(merged_signals, shape=out_shape, strides=strides)
+
+    flattened_overlapping_reg = [arr.flatten() for arr in overlapping_reg]
+    new_fitted, _ = model.fit_new(flattened_overlapping_reg)
+    ax.scatter(new_fitted[:, 0], new_fitted[:, 1], color="purple", s=10)
+    ax.scatter(new_fitted[0][0], new_fitted[0][1], color="blue", marker="^", s=10, label="start")
+    ax.scatter(new_fitted[-1][0], new_fitted[-1][1], color="red", marker="s", s=10, label="end")
+    ax.plot(new_fitted[:, 0], new_fitted[:, 1], color="purple", linestyle="-", label=file_name, linewidth=1)
+
     ax.legend()
 
     return fig, ax
