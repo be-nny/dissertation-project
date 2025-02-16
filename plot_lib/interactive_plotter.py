@@ -59,7 +59,7 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title, path) -> (plt.Ax
 
     callback = partial(on_click, fig=fig, ax=ax, data_points=data_points)
     fig.canvas.mpl_connect('pick_event', callback)
-    plt.savefig(path)
+    plt.savefig(path, bbox_inches='tight')
     return ax, fig
 
 def on_click(event, fig, ax, data_points):

@@ -191,10 +191,11 @@ class CustomPoint:
         self.y_true = y_true
         self.raw_path = raw_path
 
-def find_nearest_neighbours(latent_space: np.ndarray, raw_paths: list[str], point, n_neighbours: int, covar: np.ndarray) -> list:
+def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, covar: np.ndarray, raw_paths: list[str] = None, y_true: np.ndarray = None) -> list:
     """
     Uses mahalanobis distance to find the nearest neighbours to a point on the latent space.
 
+    :param y_true: true labels
     :param latent_space: the latent space
     :param raw_paths: the raw .mp3/.wav paths of the original audio
     :param point: a 'CustomPoint' point
@@ -205,9 +206,12 @@ def find_nearest_neighbours(latent_space: np.ndarray, raw_paths: list[str], poin
 
     nearest_neighbours = []
     for i, latent_point in enumerate(latent_space):
-        path = os.path.basename(raw_paths[i])
         dist = mahalanobis(point, latent_point, covar)
-        info = (dist, latent_point, path)
+        if raw_paths is not None:
+            path = os.path.basename(raw_paths[i])
+            info = (dist, latent_point, path)
+        else:
+            info = (dist, latent_point, y_true[i])
 
         nearest_neighbours.append(info)
 
@@ -230,7 +234,7 @@ def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred:
     custom_points = []
 
     for i, point in enumerate(latent_space):
-        nearest_neighbours = find_nearest_neighbours(latent_space, raw_paths, point, n_neighbours, covar)
+        nearest_neighbours = find_nearest_neighbours(latent_space=latent_space, raw_paths=raw_paths, point=point, n_neighbours=n_neighbours, covar=covar)
         custom_points.append(CustomPoint(point, nearest_neighbours, raw_paths[i], y_pred[i], y_true[i]))
 
     return custom_points
@@ -261,3 +265,18 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader, l
         cluster_stats[y_pred[i]][y_true[i]] += 1
 
     return cluster_stats
+
+
+def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray, n_neighbours: int = 5):
+    neighbours_true = []
+    neighbours_pred = []
+
+    for i, point in enumerate(latent_space):
+        p_label = y_true[i]
+        neighbours = find_nearest_neighbours(latent_space=latent_space, y_true=y_true, point=point, n_neighbours=n_neighbours, covar=covar)
+        for neighbour in neighbours:
+            _, p, n_label = neighbour
+            neighbours_true.append(p_label)
+            neighbours_pred.append(n_label)
+
+    return neighbours_true, neighbours_pred

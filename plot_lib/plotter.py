@@ -1,15 +1,20 @@
-from scipy.cluster.hierarchy import dendrogram
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 
+from scipy.cluster.hierarchy import dendrogram
+from sklearn.metrics import accuracy_score
+from tqdm import tqdm
+
+from model import utils
 from plot_lib import *
 
-def plot_cluster_statistics(cluster_stats: dict, path: str, logger) -> None:
+def plot_cluster_statistics(cluster_stats: dict, path: str) -> None:
     """
     Creates a figure with a set of pie chart subplots demonstrating which clusters have what genre in them.
 
-    :param title: title
     :param cluster_stats: cluster statistics
     :param path: path to save figure
-    :param logger: logger
     """
     n_cols = 4
     n_rows = int(np.ceil(len(cluster_stats) / n_cols))
@@ -54,7 +59,7 @@ def plot_cluster_statistics(cluster_stats: dict, path: str, logger) -> None:
 
     plt.tight_layout()
     plt.savefig(path, bbox_inches='tight')
-    logger.info(f"Saved plot '{path}'")
+    plt.close()
 
 def plot_2d_kmeans_boundaries(latent_space: np.ndarray, kmeans, logger, path: str, title: str, genre_filter: str, h: float = 0.02) -> None:
     """
@@ -313,15 +318,28 @@ def plot_inertia(latent_space, logger, path, title, max_clusters=20, n_genres=10
     plt.legend()
     plt.savefig(path, bbox_inches='tight')
     logger.info(f"Saved plot '{path}'")
+    plt.close()
 
-def plot_loss(loss_data, epochs, best_loss, path):
-    plt.figure(figsize=(10, 10))
-    plt.plot(epochs, loss_data, color="blue", label="Loss")
-    plt.plot(best_loss[1], best_loss[0], "o", color="red", label=f"Best Loss:{best_loss[0]}")
-    plt.title("Convolutional Autoencoder Loss")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
+def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path, max_n_neighbours: int = 100) -> None:
+    accuracy_scores = []
+    tqdm_loop = tqdm(range(1, max_n_neighbours + 1), desc="Computing correlation scores", unit="iter")
+    for n in tqdm_loop:
+        t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=covariance_mat, n_neighbours=n)
+        acc = accuracy_score(t_corr, p_corr)
+        accuracy_scores.append(acc)
+
+    plt.plot(range(1, max_n_neighbours + 1), accuracy_scores, label="Accuracy")
+    plt.xlabel("Number of Neighbours")
+    plt.ylabel("Accuracy")
     plt.legend()
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
+
+def plot_correlation(cf_matrix, class_labels, n_neighbours, path):
+    sns.heatmap(cf_matrix, annot=True, fmt="d", xticklabels=class_labels, yticklabels=class_labels)
+    plt.xlabel("Predicted Neighbour Labels")
+    plt.ylabel("True Label")
+    plt.title(f"Confusion Matrix of the {n_neighbours} Nearest Neighbours Genre Labels")
+    plt.savefig(path, bbox_inches='tight')
+    plt.close()

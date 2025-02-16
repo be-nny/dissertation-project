@@ -1,7 +1,6 @@
 import argparse
 import os
 
-import librosa
 import matplotlib
 import numpy as np
 
@@ -10,7 +9,7 @@ import logger
 import model
 
 from matplotlib import pyplot as plt
-
+from sklearn.metrics import confusion_matrix
 from model import utils, models
 from plot_lib import plotter, interactive_plotter
 from preprocessor import preprocessor as p, signal_processor as sp
@@ -103,6 +102,7 @@ def fit_new(path: str, model: models.GMMLearner, signal_func_name: str, segment_
 
     flattened_overlapping_reg = [arr.flatten() for arr in overlapping_reg]
     new_fitted, _ = model.fit_new(flattened_overlapping_reg)
+
     ax.scatter(new_fitted[:, 0], new_fitted[:, 1], color="purple", s=10)
     ax.scatter(new_fitted[0][0], new_fitted[0][1], color="blue", marker="^", s=10, label="start")
     ax.scatter(new_fitted[-1][0], new_fitted[-1][1], color="red", marker="s", s=10, label="end")
@@ -146,16 +146,16 @@ if __name__ == "__main__":
         plt.xlabel("Number of points in node (or index of point if no parenthesis).")
         plt.show()
 
-    if args.run == "metric_learning":
+    if args.run == "gaussian_model":
         with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
             signal_processor = receipt.signal_processor
             segment_duration = receipt.seg_dur
 
-        root = f"{config.OUTPUT_PATH}/models/metric_learning/{args.uuid}"
+        root = f"{config.OUTPUT_PATH}/models/gaussian_model/{args.uuid}"
         if not os.path.exists(root):
             os.makedirs(root)
 
-        logger.info("Running Model: Metric Learning Model")
+        logger.info("Running Model: Guassian Model")
 
         # create a dataloader
         _, genre_filter = get_genre_filter(args.genres)
@@ -166,19 +166,35 @@ if __name__ == "__main__":
         metric_l = models.GMMLearner(loader=batch_loader, n_clusters=args.n_clusters)
         metric_l.create_latent()
         latent_space, y_pred, y_true = metric_l.get_latent(), metric_l.get_y_pred(), metric_l.get_y_true()
+        covar = metric_l.gaussian_model.covariances_[0]
+        inv_covar = np.linalg.inv(covar)
+
+        # correlation
+        n_neighbours = 5
+        t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
+        cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
+        class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
+        path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat_{args.genres}.pdf"
+        plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path)
+        logger.info(f"Saved plot '{path}'")
+
+        # plot correlation accuracy
+        path = f"{root}/correlation_accuracy_{args.genres}.pdf"
+        plotter.plot_correlation_accuracy(latent_space=latent_space, y_true=y_true, covariance_mat=inv_covar, path=path)
+        logger.info(f"Saved plot '{path}'")
 
         # get cluster stats for tree maps
         path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"
         cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
-        plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path, logger=logger)
+        plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path)
+        logger.info(f"Saved plot '{path}'")
 
         # show window
-        covar = metric_l.gaussian_model.covariances_[0]
-        inv_covar = np.linalg.inv(covar)
         data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=inv_covar)
         path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}.pdf"
         title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
         ax, fig = interactive_plotter.interactive_gmm(gmm=metric_l.gaussian_model, data_points=data_points, title=title, path=path)
+        logger.info(f"Saved plot '{path}'")
 
         if args.fit_new_song:
             ax, fig = fit_new(path=args.fit_new_song, model=metric_l, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
