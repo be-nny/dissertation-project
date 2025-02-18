@@ -1,7 +1,6 @@
 import numpy as np
 import umap.umap_ as umap
 import torch
-from scipy.cluster.hierarchy import linkage
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.mixture import GaussianMixture
 from torch import nn

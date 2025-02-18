@@ -235,12 +235,12 @@ class Preprocessor:
 
         return self.figures_path
 
-def apply_signal(path: str, signal_func, segment_duration, target_length=None) -> np.ndarray:
+def apply_signal(path: str, signal_func, segment_duration, target_length=None, sample_rate=None) -> np.ndarray:
     """
     """
 
     # load wave source
-    wave, sr = librosa.load(path, sr=None)
+    wave, sr = librosa.load(path, sr=sample_rate)
 
     if target_length is not None:
         # normalise the length of the audio file

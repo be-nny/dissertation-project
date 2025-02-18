@@ -20,7 +20,6 @@ parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - MODEL', forma
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-r", "--run", help="Runs the model")
 parser.add_argument("-f", "--fit_new_song", help="Fit a new song. '-r' must be called first")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 parser.add_argument("-n", "--n_clusters", type=int, help="The number of clusters to find")
@@ -90,7 +89,7 @@ def fit_new(path: str, model: models.GMMLearner, signal_func_name: str, segment_
     file_name = os.path.basename(path).strip().replace("_", " ")
 
     signal_func = sp.get_type(signal_func_name)
-    segment_data = p.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration)
+    segment_data = p.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration, sample_rate=22050)
 
     stride = int(segment_data.shape[-1] * (15/30))
     window_size = int(segment_data.shape[-1] * 2)
@@ -120,101 +119,58 @@ if __name__ == "__main__":
     if args.info:
         show_info(logger, config)
 
-    if args.run == "agglomerative":
-        with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
-            signal_processor = receipt.signal_processor
+    with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
+        signal_processor = receipt.signal_processor
+        segment_duration = receipt.seg_dur
 
-        root = f"{config.OUTPUT_PATH}/models/metric_learning/{args.uuid}"
-        if not os.path.exists(root):
-            os.makedirs(root)
+    folder = f"{signal_processor}_{args.uuid}_{args.genres}_{args.n_clusters}"
+    root = f"{config.OUTPUT_PATH}/gaussian_model/{folder}"
+    if not os.path.exists(root):
+        os.makedirs(root)
 
-        logger.info("Running Model: Agglomerative Clustering")
+    logger.info("Running Gaussian Model")
 
-        # create a dataloader
-        _, genre_filter = get_genre_filter(args.genres)
-        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
-        batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
+    # create a dataloader
+    _, genre_filter = get_genre_filter(args.genres)
+    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
+    batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
-        # create metric learner
-        agg = models.HierarchicalClustering(loader=batch_loader)
-        agg.create_latent()
+    # create metric learner
+    gmm_model = models.GMMLearner(loader=batch_loader, n_clusters=args.n_clusters)
+    gmm_model.create_latent()
+    latent_space, y_pred, y_true = gmm_model.get_latent(), gmm_model.get_y_pred(), gmm_model.get_y_true()
+    covar = gmm_model.gaussian_model.covariances_[0]
+    inv_covar = np.linalg.inv(covar)
 
-        # plot dendrogram
-        plt.title("Agglomerative Clustering Dendrogram")
-        raw_labels = loader.get_associated_paths()
-        plotter.plot_dendrogram(agg.agglomerative, labels=raw_labels, truncate_mode="level")
-        plt.xlabel("Number of points in node (or index of point if no parenthesis).")
-        plt.show()
+    # correlation
+    n_neighbours = 5
+    t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
+    cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
+    class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
+    path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat.pdf"
+    plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path)
+    logger.info(f"Saved plot '{path}'")
 
-    if args.run == "gaussian_model":
-        with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
-            signal_processor = receipt.signal_processor
-            segment_duration = receipt.seg_dur
+    # plot correlation accuracy
+    path = f"{root}/correlation_accuracy.pdf"
+    plotter.plot_correlation_accuracy(latent_space=latent_space, y_true=y_true, covariance_mat=inv_covar, path=path)
+    logger.info(f"Saved plot '{path}'")
 
-        root = f"{config.OUTPUT_PATH}/models/gaussian_model/{args.uuid}"
-        if not os.path.exists(root):
-            os.makedirs(root)
+    # get cluster stats for tree maps
+    path = f"{root}/tree_map.pdf"
+    cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+    plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path)
+    logger.info(f"Saved plot '{path}'")
 
-        logger.info("Running Model: Guassian Model")
+    # show window
+    data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=inv_covar)
+    path = f"{root}/gaussian_plot.pdf"
+    title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
+    ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
+    logger.info(f"Saved plot '{path}'")
 
-        # create a dataloader
-        _, genre_filter = get_genre_filter(args.genres)
-        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
-        batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
+    if args.fit_new_song:
+        ax, fig = fit_new(path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
 
-        # create metric learner
-        metric_l = models.GMMLearner(loader=batch_loader, n_clusters=args.n_clusters)
-        metric_l.create_latent()
-        latent_space, y_pred, y_true = metric_l.get_latent(), metric_l.get_y_pred(), metric_l.get_y_true()
-        covar = metric_l.gaussian_model.covariances_[0]
-        inv_covar = np.linalg.inv(covar)
-
-        # correlation
-        n_neighbours = 5
-        t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
-        cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
-        class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
-        path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat_{args.genres}.pdf"
-        plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path)
-        logger.info(f"Saved plot '{path}'")
-
-        # plot correlation accuracy
-        path = f"{root}/correlation_accuracy_{args.genres}.pdf"
-        plotter.plot_correlation_accuracy(latent_space=latent_space, y_true=y_true, covariance_mat=inv_covar, path=path)
-        logger.info(f"Saved plot '{path}'")
-
-        # get cluster stats for tree maps
-        path = f"{root}/tree_map_{args.n_clusters}_{args.genres}.pdf"
-        cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
-        plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path)
-        logger.info(f"Saved plot '{path}'")
-
-        # show window
-        data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=inv_covar)
-        path = f"{root}/gaussian_plot_{args.n_clusters}_{args.genres}.pdf"
-        title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
-        ax, fig = interactive_plotter.interactive_gmm(gmm=metric_l.gaussian_model, data_points=data_points, title=title, path=path)
-        logger.info(f"Saved plot '{path}'")
-
-        if args.fit_new_song:
-            ax, fig = fit_new(path=args.fit_new_song, model=metric_l, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
-
-        plt.show()
-
-    if args.run == "genre_classifier":
-        with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
-            signal_processor = receipt.signal_processor
-
-        root = f"{config.OUTPUT_PATH}/models/multi_class/{args.uuid}"
-        if not os.path.exists(root):
-            os.makedirs(root)
-
-        logger.info("Running Model: Multi-class Model")
-
-        # create a dataloader
-        _, genre_filter = get_genre_filter(args.genres)
-        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=16)
-        batch_loader = loader.load(split_type="train", normalise=True, genre_filter=genre_filter)
-        input_dims = int(loader.input_shape[0])
-        multi_classifier = models.GenreClassifier(n_classes=10)
-        models.train_genre_classifier(model=multi_classifier, loader=batch_loader, n_epochs=500)
+    logger.info("Displaying Window")
+    plt.show()
