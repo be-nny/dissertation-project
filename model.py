@@ -91,8 +91,13 @@ def fit_new(path: str, model: models.GMMLearner, signal_func_name: str, segment_
     signal_func = sp.get_type(signal_func_name)
     segment_data = p.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration, sample_rate=22050)
 
-    stride = int(segment_data.shape[-1] * (15/30))
-    window_size = int(segment_data.shape[-1] * 2)
+    # if segment duration is 30 seconds, then 15 seconds of the previous window
+    # will be included in the next window
+    overlap_ratio = 0.5
+    signal_func_width = segment_data.shape[-1]
+
+    stride = int(signal_func_width * overlap_ratio)
+    window_size = int(signal_func_width)
 
     merged_signals = np.concatenate(segment_data, axis=-1)
     out_shape = ((merged_signals.shape[1] - window_size) // stride + 1, merged_signals.shape[0], window_size)
