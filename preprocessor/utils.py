@@ -11,7 +11,7 @@ def create_graph_example_figures(signal_processor, song_paths, figures_path, num
     """
     Creates a set of example figures for a given song. This uses the entire duration of the song
 
-    :param signal_processors: the signal processor functions to apply to the wave form
+    :param signal_processor: the signal processor functions to apply to the wave form
     :param song_paths: list of all songs
     :param figures_path: path to save figures
     :param num_songs: number of random figures to generate
