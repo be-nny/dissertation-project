@@ -73,6 +73,12 @@ class Loader:
         self.logger.info(f"'{self.uuid}' applied with {self.signal_processor}")
 
     def _make_splits(self, split_type: str) -> list:
+        """
+        Creates a test or train split. After creation, the data is shuffled randomly.
+
+        :param split_type: type of split (test/train)
+        :return: a data split
+        """
         split = []
         split_path = os.path.join(self.root, split_type)
         for genre_dir in os.listdir(split_path):
@@ -86,7 +92,20 @@ class Loader:
         np.random.shuffle(split)
         return split
 
-    def load(self, split_type: str, normalise: bool = True, genre_filter: list = [], flatten: bool = False):
+    def load(self, split_type: str, normalise: bool = True, genre_filter: list = [], flatten: bool = False) -> DataLoader:
+        """
+        Loads the preprocessed dataset. The data can be normalised, which normalises the signals by subtracting
+        the mean signal and dividing by the standard deviation. The data can also be flattened. This is usually required
+        if the data is fed into a dimensionality reduction algorithm like UMAP.
+
+        A genre filter can also be parsed which is a list of string genre tags - this can be empty to load all genres.
+
+        :param split_type: type of split (test/train/all). All will load both the test and train data.
+        :param normalise: flag to normalise the signals
+        :param genre_filter: the genres to include in the loaded data.
+        :param flatten: flag to flatten the dataa
+        :return: tensorflow data loader
+        """
         self.split_type = split_type
         self.logger.info(f"'normalise' flag set to '{normalise}'")
         self.logger.info(f"'flatten' flag set to '{flatten}'")
@@ -117,9 +136,21 @@ class Loader:
         return self.dataloader
 
     def encode_label(self, labels):
+        """
+        Convert string labels to numeric values
+
+        :param labels: string labels
+        :return: numeric values
+        """
         return self.label_encoder.transform(labels)
 
     def decode_label(self, encoded_labels):
+        """
+        Convert numeric labels back to their original string values
+
+        :param encoded_labels: 1-D array of numeric labels
+        :return: string labels
+        """
         return self.label_encoder.inverse_transform(encoded_labels)
 
     def _get_data_split(self, split_type, normalise: bool, genre_filter: list):
@@ -169,6 +200,10 @@ class Loader:
         return signal_data, genre_labels
 
     def get_associated_paths(self):
+        """
+        :return: The original file path associated with the data points
+        """
+
         return self.loaded_files
 
     def get_figures_path(self):
