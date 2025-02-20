@@ -10,7 +10,7 @@ import logger
 import model
 
 from matplotlib import pyplot as plt
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, homogeneity_score, silhouette_score, calinski_harabasz_score
 from model import utils, models
 from plot_lib import plotter, interactive_plotter
 from preprocessor import preprocessor as p, signal_processor as sp
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
     batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
-    # create metric learner
+    # create metric learner (gaussian mixture model)
     gmm_model = models.GMMLearner(loader=batch_loader, n_clusters=args.n_clusters)
     gmm_model.create_latent()
     latent_space, y_pred, y_true = gmm_model.get_latent(), gmm_model.get_y_pred(), gmm_model.get_y_true()
@@ -164,7 +164,6 @@ if __name__ == "__main__":
     logger.info(f"Saved plot '{path}'")
 
     # get cluster stats for tree maps
-    path = f"{root}/tree_map.pdf"
     cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
 
     # find the largest genre per cluster
@@ -175,10 +174,8 @@ if __name__ == "__main__":
         prominent_cluster_genre.update({cluster_key: largest_genre})
     prominent_cluster_genre = dict(sorted(prominent_cluster_genre.items(), key=lambda item: item[0]))
 
-    prom_genres = "Most Common Genre per Cluster: \n" + '\n'.join([f"> Cluster {k}: {v}" for k, v in prominent_cluster_genre.items()])
-    logger.info(prom_genres)
-
-
+    # plot treemaps
+    path = f"{root}/tree_map.pdf"
     plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path)
     logger.info(f"Saved plot '{path}'")
 
@@ -189,8 +186,14 @@ if __name__ == "__main__":
     ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
     logger.info(f"Saved plot '{path}'")
 
+    # fit new song to plot the 'song evolution'
     if args.fit_new_song:
         ax, fig = fit_new(path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
 
     logger.info("Displaying Window")
+
+    prom_genres = "Most Common Genre per Cluster: \n" + '\n'.join([f"> Cluster {k}: {v}" for k, v in prominent_cluster_genre.items()])
+    logger.info(prom_genres)
+    logger.info(f"Homogeneity Score: {homogeneity_score(y_true, y_pred)}")
+    logger.info(f"Calinski Harabasz Score: {calinski_harabasz_score(latent_space, y_pred)}")
     plt.show()
