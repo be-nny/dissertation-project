@@ -3,6 +3,7 @@ import os
 
 import matplotlib
 import numpy as np
+from tqdm import tqdm
 
 import config
 import logger
@@ -91,9 +92,9 @@ def fit_new(path: str, model: models.GMMLearner, signal_func_name: str, segment_
     signal_func = sp.get_type(signal_func_name)
     segment_data = p.apply_signal(path=path, signal_func=signal_func, segment_duration=segment_duration, sample_rate=22050)
 
-    # if segment duration is 30 seconds, then 15 seconds of the previous window
+    # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
-    overlap_ratio = 0.5
+    overlap_ratio = 0.1
     signal_func_width = segment_data.shape[-1]
 
     stride = int(signal_func_width * overlap_ratio)
@@ -148,13 +149,14 @@ if __name__ == "__main__":
     inv_covar = np.linalg.inv(covar)
 
     # correlation
-    n_neighbours = 5
-    t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
-    cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
-    class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
-    path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat.pdf"
-    plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path)
-    logger.info(f"Saved plot '{path}'")
+    n_neighbours_total = [1, 5, 10, 50]
+    tqdm_loop = tqdm(n_neighbours_total, desc="Computing correlation matrices", unit="iter")
+    for n_neighbours in tqdm_loop:
+        t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
+        cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
+        class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
+        path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat.pdf"
+        plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path)
 
     # plot correlation accuracy
     path = f"{root}/correlation_accuracy.pdf"
@@ -164,6 +166,19 @@ if __name__ == "__main__":
     # get cluster stats for tree maps
     path = f"{root}/tree_map.pdf"
     cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+
+    # find the largest genre per cluster
+    prominent_cluster_genre = {}
+    for cluster_key, values in cluster_stats.items():
+        sort_by_value = dict(sorted(values.items(), key=lambda item: item[1]))
+        largest_genre = list(sort_by_value)[-1]
+        prominent_cluster_genre.update({cluster_key: largest_genre})
+    prominent_cluster_genre = dict(sorted(prominent_cluster_genre.items(), key=lambda item: item[0]))
+
+    prom_genres = "Most Common Genre per Cluster: \n" + '\n'.join([f"> Cluster {k}: {v}" for k, v in prominent_cluster_genre.items()])
+    logger.info(prom_genres)
+
+
     plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path)
     logger.info(f"Saved plot '{path}'")
 

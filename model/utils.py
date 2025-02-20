@@ -234,8 +234,19 @@ def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred:
     custom_points = []
 
     for i, point in enumerate(latent_space):
+        raw_path = None
+        curr_y_pred = None
+        curr_y_true = None
+
+        if raw_paths is not None:
+            raw_path = raw_paths[i]
+        if y_pred is not None:
+            curr_y_pred = y_pred[i]
+        if y_true is not None:
+            curr_y_true = y_true[i]
+
         nearest_neighbours = find_nearest_neighbours(latent_space=latent_space, raw_paths=raw_paths, point=point, n_neighbours=n_neighbours, covar=covar)
-        custom_points.append(CustomPoint(point, nearest_neighbours, raw_paths[i], y_pred[i], y_true[i]))
+        custom_points.append(CustomPoint(point, nearest_neighbours, raw_path, curr_y_pred, curr_y_true))
 
     return custom_points
 
