@@ -1,25 +1,4 @@
 # Music Analysis with Machine Learning
-# **Preprocessing**
-This is responsible for preprocessing a dataset ready for processing. For preprocessing options, run:
-
-```pycon
-python preprocessor.py --help
-```
-
-```pycon    
-usage: Music Analysis Tool (MAT) - PREPROCESSOR [-h] -c CONFIG -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...] [-f FIGURES]
-
-Preprocess Audio Dataset
-
-options:
-  -h, --help            show this help message and exit
-  -c CONFIG, --config CONFIG
-                        config file
-  -s {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...], --signal_processors {CQT,STFT,MEL_SPEC,SPEC_CENTROID} [{CQT,STFT,MEL_SPEC,SPEC_CENTROID} ...]
-                        the signal processors to apply to the raw audio
-  -f FIGURES, --figures FIGURES
-                        create a set of n example figures
-```
 
 ## The `config.yml` File
 This file contains any configuration settings for preprocessing and training a model.
@@ -45,12 +24,4 @@ dataset/
 ├─ genre_.../
 ├─ genre_n/
 ```
-
-## Spectrographs
-Below demonstrates the possible spectrographs that can be generated in the preprocessing pipeline
-
-<img src="examples/rock_example_figure_CQT_0.png" width="400"/> <img src="examples/rock_example_figure_MEL_SPEC_0.png" width="400"/> 
-<img src="examples/rock_example_figure_SPEC_CENTROID_0.png" width="400"/> <img src="examples/rock_example_figure_STFT_0.png" width="400"/>
-
-# **Model**
 
