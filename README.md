@@ -28,7 +28,7 @@ dataset/
 ## Preprocessing
 
 ## Model
-Running the following command will use all the genres, `-g all`, in the preprocessed dataset, `-u UUID`, with 10 clusters to produce a gaussian mixture model plot.
+Running the following command will use all the genres, `-g all`, in the preprocessed dataset, `-u UUID`, with 10 clusters to produce a gaussian mixture model plot. The plot contains 3 ellipses signifying the 1st, 2nd, and 3rd standard deviations explaining the likelihood of a point belonging to a particular cluster. 
 ```pycon
 python model.py -c config.yml -u UUID -g all -n 10
 ```
