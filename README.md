@@ -25,3 +25,14 @@ dataset/
 ├─ genre_n/
 ```
 
+## Preprocessing
+
+## Model
+Running the following command will use all the genres, `-g all`, in the preprocessed dataset, `-u UUID`, with 10 clusters to produce a gaussian mixture model plot.
+```pycon
+python model.py -c config.yml -u UUID -g all -n 10
+```
+![gaussian_plot.png](examples/gaussian_plot.png)
+
+The treemap shows which genres belong in which cluster.
+![tree_map.png](examples/tree_map.png)
