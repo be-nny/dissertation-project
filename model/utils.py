@@ -314,6 +314,15 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader, l
 
 
 def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray, n_neighbours: int = 5):
+    """
+    Works out the number of 'n' nearest neighbours for every point. Each neighbour is compared to the true label of each point.
+
+    :param latent_space: latent space
+    :param y_true: true labels
+    :param covar: inverse covariance matrix
+    :param n_neighbours: the number of nearest neighbours
+    :return: true values, nearest neighbours predicted
+    """
     neighbours_true = []
     neighbours_pred = []
 
