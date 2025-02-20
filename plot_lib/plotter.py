@@ -11,7 +11,7 @@ from plot_lib import *
 
 def plot_cluster_statistics(cluster_stats: dict, path: str) -> None:
     """
-    Creates a figure with a set of pie chart subplots demonstrating which clusters have what genre in them.
+    Creates a figure with a set of treemap subplots demonstrating which clusters have what genre in them.
 
     :param cluster_stats: cluster statistics
     :param path: path to save figure
