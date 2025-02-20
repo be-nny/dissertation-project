@@ -323,6 +323,7 @@ def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray,
     :param n_neighbours: the number of nearest neighbours
     :return: true values, nearest neighbours predicted
     """
+
     neighbours_true = []
     neighbours_pred = []
 
