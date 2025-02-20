@@ -10,7 +10,6 @@ import logger
 from plot_lib.plotter import *
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.mixture import GaussianMixture
 from model import utils
 
 matplotlib.use('TkAgg')

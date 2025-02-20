@@ -235,8 +235,16 @@ class Preprocessor:
 
         return self.figures_path
 
-def apply_signal(path: str, signal_func, segment_duration, target_length=None, sample_rate=None) -> np.ndarray:
+def apply_signal(path: str, signal_func, segment_duration: int, target_length=None, sample_rate=None) -> np.ndarray:
     """
+    Applies the specified signal function to the raw audio signal.
+
+    :param path: path to audio file
+    :param signal_func: function to apply to signal
+    :param segment_duration: duration of the segment
+    :param target_length: length to clip each segment to
+    :param sample_rate: sampling rate
+    :return: audio signal applied with the signal function
     """
 
     # load wave source
