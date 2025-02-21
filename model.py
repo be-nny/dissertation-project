@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 
 import matplotlib
 import numpy as np
@@ -150,6 +151,9 @@ if __name__ == "__main__":
 
     # create graph for shortest path
     graph = utils.connected_graph(latent_space, inv_covar)
+    s = ','.join(str(p) for p in latent_space[np.random.randint(len(latent_space))])
+    e = ','.join(str(p) for p in latent_space[np.random.randint(len(latent_space))])
+    _, shortest_path = utils.shortest_path(graph, s, e)
 
     # correlation
     n_neighbours_total = [1, 5, 10, 50]
@@ -188,6 +192,8 @@ if __name__ == "__main__":
     title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
     ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
     logger.info(f"Saved plot '{path}'")
+
+    ax.plot(shortest_path[:, 0], shortest_path[:, 1], color="r")
 
     # fit new song to plot the 'song evolution'
     if args.fit_new_song:

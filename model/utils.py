@@ -341,6 +341,15 @@ def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray,
     return neighbours_true, neighbours_pred
 
 def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: int = 5) -> dict:
+    """
+    Creates an undirected weighted graph, given a nearest neighbour value, of every point and what its distance is from
+    its nearest points is.
+
+    :param latent_space: the latent space
+    :param covar: inverse covariance matrix
+    :param n_neighbours: nearest neighbours
+    :return: graph
+    """
     graph = {}
     for point in latent_space:
         point_str = ','.join(str(p) for p in point)
@@ -355,7 +364,15 @@ def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: i
 
     return graph
 
-def shortest_path(graph, start, end):
+def shortest_path(graph: dict, start: np.ndarray, end: np.ndarray) -> tuple[float, np.ndarray]:
+    """
+    Works out the shortest path (using dijkstra's algorithm) between a start and end point given a connect undirected weight graph
+    :param graph: undirected weighted graph
+    :param start: start node
+    :param end: end node
+
+    :return: (distance, shortest_path)
+    """
     priority_queue = []
 
     # (distance, node, path)
@@ -368,7 +385,11 @@ def shortest_path(graph, start, end):
         path = path + [current_node]
 
         if current_node == end:
-            return current_distance, path
+            points_path = []
+            for node in path:
+                points_path.append([np.float64(p) for p in node.split(",")])
+
+            return current_distance, np.array(points_path)
 
         if current_distance > distances[current_node]:
             continue
@@ -379,4 +400,4 @@ def shortest_path(graph, start, end):
                 distances[neighbour] = distance
                 heapq.heappush(priority_queue, (distance, neighbour, path))
 
-    return float('inf'), []
+    return float('inf'), np.array([])

@@ -77,7 +77,7 @@ def _show_nearest_neighbours(event, fig, ax, data_points):
             point = list(neighbour_data)[1]
             name = list(neighbour_data)[2]
 
-            ax.annotate(f"{name}", (point[0], point[1]), textcoords="offset points", xytext=(0,5), ha='center')
+            ax.annotate(f"{name}", (point[0], point[1]), textcoords="offset points", xytext=(0,3), ha='center')
             ax.plot([data_points[i].x, point[0]], [data_points[i].y, point[1]], color='black')
 
     fig.canvas.draw()
