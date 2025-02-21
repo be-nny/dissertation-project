@@ -57,12 +57,20 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title, path) -> (plt.Ax
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
 
-    callback = partial(on_click, fig=fig, ax=ax, data_points=data_points)
+    callback = partial(_show_nearest_neighbours, fig=fig, ax=ax, data_points=data_points)
     fig.canvas.mpl_connect('pick_event', callback)
     plt.savefig(path, bbox_inches='tight')
     return ax, fig
 
-def on_click(event, fig, ax, data_points):
+def _show_nearest_neighbours(event, fig, ax, data_points):
+    """
+    Shows the nearest neighbours when a point is clicked on the canvas
+
+    :param event: click event
+    :param fig: figure
+    :param ax: axes
+    :param data_points: plotted data points
+    """
     ind = event.ind
     for i in ind:
         for neighbour_data in data_points[i].nearest_neighbours:
