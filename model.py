@@ -94,7 +94,7 @@ def fit_new(new_file_path: str, model: models.GMMLearner, signal_func_name: str,
 
     # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
-    overlap_ratio = 1
+    overlap_ratio = 0.1
     signal_func_width = segment_data.shape[-1]
 
     stride = int(signal_func_width * overlap_ratio)
@@ -147,6 +147,9 @@ if __name__ == "__main__":
     latent_space, y_pred, y_true = gmm_model.get_latent(), gmm_model.get_y_pred(), gmm_model.get_y_true()
     covar = gmm_model.gaussian_model.covariances_[0]
     inv_covar = np.linalg.inv(covar)
+
+    # create graph for shortest path
+    graph = utils.connected_graph(latent_space, inv_covar)
 
     # correlation
     n_neighbours_total = [1, 5, 10, 50]

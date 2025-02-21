@@ -1,3 +1,4 @@
+import heapq
 import json
 import os
 import h5py
@@ -245,8 +246,10 @@ def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, 
         if raw_paths is not None:
             path = os.path.basename(raw_paths[i])
             info = (dist, latent_point, path)
-        else:
+        elif y_true is not None:
             info = (dist, latent_point, y_true[i])
+        else:
+            info = (dist, latent_point)
 
         nearest_neighbours.append(info)
 
@@ -336,3 +339,44 @@ def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray,
             neighbours_pred.append(n_label)
 
     return neighbours_true, neighbours_pred
+
+def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: int = 5) -> dict:
+    graph = {}
+    for point in latent_space:
+        point_str = ','.join(str(p) for p in point)
+        neighbour_data = find_nearest_neighbours(latent_space=latent_space, point=point, n_neighbours=n_neighbours, covar=covar)
+
+        conn = []
+        for data in neighbour_data:
+            dist, neighbour = data
+            conn.append((','.join(str(p) for p in neighbour), dist))
+
+        graph.update({point_str: conn})
+
+    return graph
+
+def shortest_path(graph, start, end):
+    priority_queue = []
+
+    # (distance, node, path)
+    heapq.heappush(priority_queue, (0, start, []))
+    distances = {node: float('inf') for node in graph}
+    distances[start] = 0
+
+    while priority_queue:
+        current_distance, current_node, path = heapq.heappop(priority_queue)
+        path = path + [current_node]
+
+        if current_node == end:
+            return current_distance, path
+
+        if current_distance > distances[current_node]:
+            continue
+
+        for neighbour, weight in graph[current_node]:
+            distance = current_distance + weight
+            if distance < distances[neighbour]:
+                distances[neighbour] = distance
+                heapq.heappush(priority_queue, (distance, neighbour, path))
+
+    return float('inf'), []
