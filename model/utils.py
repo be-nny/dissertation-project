@@ -350,6 +350,7 @@ def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: i
     :param n_neighbours: nearest neighbours
     :return: graph
     """
+
     graph = {}
     for point in latent_space:
         point_str = ','.join(str(p) for p in point)
@@ -364,7 +365,7 @@ def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: i
 
     return graph
 
-def shortest_path(graph: dict, start: np.ndarray, end: np.ndarray) -> tuple[float, np.ndarray]:
+def shortest_path(graph: dict, start:str, end: str):
     """
     Works out the shortest path (using dijkstra's algorithm) between a start and end point given a connect undirected weight graph
     :param graph: undirected weighted graph
@@ -373,6 +374,7 @@ def shortest_path(graph: dict, start: np.ndarray, end: np.ndarray) -> tuple[floa
 
     :return: (distance, shortest_path)
     """
+
     priority_queue = []
 
     # (distance, node, path)

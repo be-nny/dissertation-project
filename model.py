@@ -22,7 +22,8 @@ parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - MODEL', forma
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-f", "--fit_new_song", help="Fit a new song. '-r' must be called first")
+parser.add_argument("-f", "--fit_new_song", help="Fit a new song")
+parser.add_argument("-p", "--path", action="store_true", help="Plots the shortest path between two random starting points")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 parser.add_argument("-n", "--n_clusters", type=int, help="The number of clusters to find")
 
@@ -149,12 +150,6 @@ if __name__ == "__main__":
     covar = gmm_model.gaussian_model.covariances_[0]
     inv_covar = np.linalg.inv(covar)
 
-    # create graph for shortest path
-    graph = utils.connected_graph(latent_space, inv_covar)
-    s = ','.join(str(p) for p in latent_space[np.random.randint(len(latent_space))])
-    e = ','.join(str(p) for p in latent_space[np.random.randint(len(latent_space))])
-    _, shortest_path = utils.shortest_path(graph, s, e)
-
     # correlation
     n_neighbours_total = [1, 5, 10, 50]
     tqdm_loop = tqdm(n_neighbours_total, desc="Computing correlation matrices", unit="iter")
@@ -193,7 +188,47 @@ if __name__ == "__main__":
     ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
     logger.info(f"Saved plot '{path}'")
 
-    ax.plot(shortest_path[:, 0], shortest_path[:, 1], color="r")
+    # create graph for shortest path
+    graph = utils.connected_graph(latent_space, inv_covar)
+    start_point = latent_space[np.random.randint(len(latent_space))]
+    end_point = latent_space[np.random.randint(len(latent_space))]
+
+    s = ','.join(str(p) for p in start_point)
+    e = ','.join(str(p) for p in end_point)
+    _, shortest_path = utils.shortest_path(graph, s, e)
+
+    # plotting the shortest path between two random points
+    if not len(shortest_path):
+        logger.warning("No shortest path could be found. Try adjusting nearset neighbours for `utils.connected_graph`")
+
+    if args.path and len(shortest_path) > 1:
+        padding = 3
+        ax.plot(shortest_path[:, 0], shortest_path[:, 1], color="pink", label="Shortest path")
+
+        # annotate which song is which point
+        for p1 in shortest_path:
+            for p2 in data_points:
+                if np.all(p1 == p2.point):
+                    name = os.path.basename(p2.raw_path)
+                    ax.annotate(name, (p1[0], p1[1]), textcoords="offset points", xytext=(5, 2), ha='center', fontsize=5, alpha=0.5)
+                    break
+
+        # adjust view
+        if start_point[0] < end_point[0]:
+            plt.xlim(start_point[0] - padding, end_point[0] + padding)
+        else:
+            plt.xlim(end_point[0] - padding, start_point[0] + padding)
+
+        if start_point[1] < end_point[1]:
+            plt.ylim(start_point[1] - padding, end_point[1] + padding)
+        else:
+            plt.ylim(end_point[1] - padding, start_point[1] + padding)
+
+        # save
+        plt.legend()
+        path = f"{root}/gaussian_plot_shortest_path.pdf"
+        plt.savefig(path)
+        logger.info(f"Saved plot '{path}'")
 
     # fit new song to plot the 'song evolution'
     if args.fit_new_song:
@@ -203,6 +238,7 @@ if __name__ == "__main__":
         plt.savefig(path)
         logger.info(f"Saved plot '{path}'")
 
+    plt.autoscale()
     logger.info("Displaying Window")
 
     prom_genres = "Most Common Genre per Cluster: \n" + '\n'.join([f"> Cluster {k}: {v}" for k, v in prominent_cluster_genre.items()])
