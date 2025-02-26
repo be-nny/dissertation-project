@@ -88,11 +88,11 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: model.uti
 
     return cluster_stats
 
-def fit_new(new_file_path: str, model: models.GMMLearner, signal_func_name: str, segment_duration: int, fig: plt.Figure, ax: plt.Axes):
+def fit_new(new_file_path: str, model: models.GMMLearner, signal_func_name: str, segment_duration: int, sample_rate: int, fig: plt.Figure, ax: plt.Axes):
     file_name = os.path.basename(new_file_path).strip().replace("_", " ")
 
     signal_func = sp.get_type(signal_func_name)
-    segment_data = p.apply_signal(path=new_file_path, signal_func=signal_func, segment_duration=segment_duration, sample_rate=22050)
+    segment_data = p.apply_signal(path=new_file_path, signal_func=signal_func, segment_duration=segment_duration, sample_rate=sample_rate)
 
     # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
@@ -234,7 +234,7 @@ if __name__ == "__main__":
 
     # fit new song to plot the 'song evolution'
     if args.fit_new_song:
-        ax, fig = fit_new(new_file_path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, segment_duration=segment_duration, fig=fig, ax=ax)
+        ax, fig = fit_new(new_file_path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
         file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
         path = f"{root}/gaussian_plot_with_{file_name}.pdf"
         plt.savefig(path)

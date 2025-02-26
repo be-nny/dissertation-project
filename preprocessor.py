@@ -16,11 +16,10 @@ if __name__ == "__main__":
     logger = logger.get_logger()
 
     # load config file
-    if args.config:
-        config = config.Config(path=args.config)
+    config_obj = config.Config(path=args.config)
 
     # creating a preprocessor
-    preprocessor = p.Preprocessor(dataset_dir=config.DATASET_PATH, target_length=config.TARGET_LENGTH, segment_duration=config.SEGMENT_DURATION, output_dir=config.OUTPUT_PATH, logger=logger, train_split=config.TRAIN_SPLIT).set_signal_processor(get_type(args.signal_processor))
+    preprocessor = p.Preprocessor(dataset_dir=config_obj.DATASET_PATH, target_length=config_obj.TARGET_LENGTH, segment_duration=config_obj.SEGMENT_DURATION, sample_rate=config_obj.SAMPLE_RATE, output_dir=config_obj.OUTPUT_PATH, logger=logger, train_split=config_obj.TRAIN_SPLIT).set_signal_processor(get_type(args.signal_processor))
 
     # create examples
     if args.figures:

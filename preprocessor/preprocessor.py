@@ -69,7 +69,7 @@ def _create_hdf(path: str, **kwargs):
 
 
 class Preprocessor:
-    def __init__(self, dataset_dir: str, output_dir: str, target_length: int, logger: logging.Logger, train_split=0.6, segment_duration=10):
+    def __init__(self, dataset_dir: str, output_dir: str, target_length: int, sample_rate: int, logger: logging.Logger, train_split=0.6, segment_duration=10):
         """
         Create a preprocessor to preprocess a set of songs in a dataset.
 
@@ -81,6 +81,7 @@ class Preprocessor:
         self.dataset_dir = dataset_dir
         self.output_dir = output_dir
         self.logger = logger
+        self.sample_rate = sample_rate
 
         self.start_datetime = None
         self.end_time = None
@@ -167,7 +168,7 @@ class Preprocessor:
             os.mkdir(output_dir)
 
         # use the signal processor context to create generator that creates the song snippets
-        signals = apply_signal(path=path, signal_func=self.signal_processor, segment_duration=self.segment_duration, target_length=self.target_length)
+        signals = apply_signal(path=path, signal_func=self.signal_processor, segment_duration=self.segment_duration, target_length=self.target_length, sample_rate=self.sample_rate)
 
         # save the layers to HDF5 file
         for i, signal in enumerate(signals):
