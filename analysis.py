@@ -139,7 +139,7 @@ if __name__ == "__main__":
             # plot genre spread
             stats = utils.cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
             path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
-            plot_cluster_statistics(cluster_stats=stats, path=path2, logger=logger)
+            plot_tree_map(cluster_stats=stats, path=path2, logger=logger)
 
         if args.inertia:
             experiments_dir = os.path.join(experiments_dir_root, "kmeans-inertia-plots")

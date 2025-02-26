@@ -178,7 +178,7 @@ if __name__ == "__main__":
 
     # plot treemaps
     path = f"{root}/tree_map.pdf"
-    plotter.plot_cluster_statistics(cluster_stats=cluster_stats, path=path)
+    plotter.plot_tree_map(cluster_stats=cluster_stats, path=path)
     logger.info(f"Saved plot '{path}'")
 
     # show window

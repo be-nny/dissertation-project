@@ -9,7 +9,7 @@ from tqdm import tqdm
 from model import utils
 from plot_lib import *
 
-def plot_cluster_statistics(cluster_stats: dict, path: str) -> None:
+def plot_tree_map(cluster_stats: dict, path: str) -> None:
     """
     Creates a figure with a set of treemap subplots demonstrating which clusters have what genre in them.
 
