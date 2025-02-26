@@ -18,6 +18,9 @@ properties:
       train_split:
         type: number
         description: Train split
+      sample_rate:
+        type: number
+        description: Sample rate for the songs
     required:
       - target_length
       - segment_duration
