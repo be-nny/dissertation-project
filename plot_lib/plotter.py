@@ -299,17 +299,28 @@ def plot_inertia(latent_space, logger, path, title, max_clusters=20, n_genres=10
     logger.info(f"Saved plot '{path}'")
     plt.close()
 
-def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path, max_n_neighbours: int = 100) -> None:
+def plot_correlation_metrics(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path, max_n_neighbours: int = 100) -> None:
     accuracy_scores = []
+    f1_scores = []
+    recall_scores = []
+    precision_scores = []
+
     tqdm_loop = tqdm(range(1, max_n_neighbours + 1), desc="Computing correlation scores", unit="iter")
     for n in tqdm_loop:
         t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=covariance_mat, n_neighbours=n)
-        acc = accuracy_score(t_corr, p_corr)
+        f1, precision, recall, acc = utils.correlation_metrics(t_corr, p_corr)
         accuracy_scores.append(acc)
+        f1_scores.append(f1)
+        recall_scores.append(recall)
+        precision_scores.append(precision)
 
     plt.plot(range(1, max_n_neighbours + 1), accuracy_scores, label="Accuracy")
+    plt.plot(range(1, max_n_neighbours + 1), f1_scores, label="F1 Score")
+    plt.plot(range(1, max_n_neighbours + 1), recall_scores, label="Recall")
+    plt.plot(range(1, max_n_neighbours + 1), precision_scores, label="Precision")
+
     plt.xlabel("Number of Neighbours")
-    plt.ylabel("Accuracy")
+    plt.ylabel("Metric Score")
     plt.legend()
     plt.savefig(path, bbox_inches='tight')
     plt.close()
