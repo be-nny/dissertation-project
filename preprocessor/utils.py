@@ -21,7 +21,7 @@ def create_graph_example_figures(signal_processor, song_paths, figures_path, num
         path, genre = random.choice(song_paths)
 
         wave, sr = librosa.load(path, sr=None)
-        signal_processor(wave, sr, path=f"{figures_path}/{genre}_example_figure_{signal_processor.__name__}_{i}.pdf", debug=True)
+        signal_processor(wave, sr, path=f"{figures_path}/{genre}_example_figure_{signal_processor.__name__}_{i}.pdf")
 
 def get_song_metadata(path: str) -> str:
     """

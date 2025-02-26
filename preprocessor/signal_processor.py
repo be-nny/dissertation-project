@@ -54,7 +54,7 @@ class SignalLoader:
     def __exit__(self, type, value, traceback):
         pass
 
-def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
+def STFT(wave: np.ndarray, sr: float, path=None):
     """
     Create a Short Time Fourier Transform for a waveform.
     This a method for analyzing how the frequency content of a signal changes over time.
@@ -63,8 +63,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
 
     :param wave: raw audio data
     :param sr: sample rate
-    :param path: output path, default to None
-    :param debug: debug mode, default to False. If true, an example figure will be saved
+    :param path: output path for debug purposes, default to None
     :return: an array of magnitudes of each complex value in the Short-Time Fourier Transform (STFT) result.
     """
 
@@ -74,7 +73,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
 
     f, t, transform = signal.stft(wave, fs=sr, nperseg=NPERSEG, nfft=N_FFT)
 
-    if not debug:
+    if path is None:
         # transform contains complex values, the complex components contain phase
         # information - taking the magnitude results in only amplitude.
         return list(np.abs(transform))
@@ -87,7 +86,7 @@ def STFT(wave: np.ndarray, sr: float, path=None, debug=False):
         plt.close()
         return None
 
-def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
+def MEL_SPEC(wave: np.ndarray, sr: float, path=None):
     """
     Create a Mel Spectrogram for a waveform.
     This is a visual representation of the frequency spectrum of an audio signal over time, where the frequencies are converted to the mel scale
@@ -95,8 +94,7 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
 
     :param wave: raw audio data
     :param sr: sample rate
-    :param path: output path, default to None
-    :param debug: debug mode, default to False. If true, an example figure will be saved
+    :param path: output path for debug purposes, default to None
     :return: mel spectrogram on a logarithmic scale
     """
 
@@ -109,7 +107,7 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
     # this converts the power values to a logarithmic scale since humans perceive loudness this way
     mel_spectrogram_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
 
-    if not debug:
+    if path is None:
         return mel_spectrogram_db
     else:
         # Plot the Mel spectrogram
@@ -122,7 +120,7 @@ def MEL_SPEC(wave: np.ndarray, sr: float, path=None, debug=False):
         return None
 
 
-def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
+def CQT(wav: np.ndarray, sr: float, path=None):
     """
     Generate the constant-Q transform of an audio signal.
     This converts a data series from the time domain to the frequency domain.
@@ -130,8 +128,7 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
 
     :param wav: raw audio data
     :param sr: sample rate
-    :param path: output path, default to None
-    :param debug: debug mode, default to False
+    :param path: output path for debug purposes, default to None
     :return: cqt as an image array
     """
 
@@ -140,7 +137,7 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
     # converted to a logarithmic scale
     cqt_transform_db = librosa.amplitude_to_db(cqt_transform, ref=np.max)
 
-    if not debug:
+    if path is None:
         return cqt_transform_db
     else:
         plt.figure(figsize=FIGURE_SIZE)
@@ -151,22 +148,21 @@ def CQT(wav: np.ndarray, sr: float, path=None, debug=False):
         plt.close()
         return None
 
-def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
+def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None):
     """
     Generate a spectral centroid of the audio file.
     A spectral centroid is the location of the centre of mass of the spectrum.
 
     :param wav: raw audio data
     :param sr: sample rate
-    :param path: output path, default to None
-    :param debug: debug mode, default to False
+    :param path: output path for debug purposes, default to None
     :return: spectral centroid as an image array
     """
 
     S, _ = librosa.magphase(librosa.stft(y=wav))
     spectral_centroid = librosa.feature.spectral_centroid(S=S, sr=sr, hop_length=HOP_LENGTH)
 
-    if not debug:
+    if path is None:
         return spectral_centroid
     else:
         plt.figure(figsize=FIGURE_SIZE)
@@ -180,21 +176,20 @@ def SPEC_CENTROID(wav: np.ndarray, sr: float, path=None, debug=False):
         plt.close()
         return None
 
-def MFCC(wav: np.ndarray, sr: float, path=None, debug=False):
+def MFCC(wav: np.ndarray, sr: float, path=None):
     """
     Generate a MFCC of the audio file.
 
     :param wav: raw audio data
     :param sr: sample rate
-    :param path: output path, default to None
-    :param debug: debug mode, default to False
+    :param path: output path for debug purposes, default to None
     :return: spectral centroid as an image array
     """
 
     mfcc = librosa.feature.mfcc(y=wav, sr=sr, hop_length=HOP_LENGTH, n_mels=N_MELS, n_fft=N_FFT)
     mfcc_db = librosa.power_to_db(mfcc, ref=np.max)
 
-    if not debug:
+    if path is None:
         return mfcc_db
     else:
         plt.figure(figsize=FIGURE_SIZE)
