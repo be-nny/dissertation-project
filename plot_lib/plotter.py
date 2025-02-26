@@ -200,27 +200,6 @@ def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,
     plt.savefig(path, bbox_inches='tight')
     logger.info(f"Saved plot '{path}'")
 
-
-def plot_dendrogram(model, labels=None, **kwargs):
-    counts = np.zeros(model.children_.shape[0])
-    n_samples = len(model.labels_)
-
-    for i, merge in enumerate(model.children_):
-        current_count = 0
-        for child_idx in merge:
-            if child_idx < n_samples:
-                current_count += 1
-            else:
-                current_count += counts[child_idx - n_samples]
-        counts[i] = current_count
-
-    linkage_matrix = np.column_stack(
-        [model.children_, model.distances_, counts]
-    ).astype(float)
-
-    # plot the corresponding dendrogram
-    dendrogram(linkage_matrix, labels=labels, **kwargs)
-
 def draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
     """
     Draw an ellipse with a given position and covariance
