@@ -3,7 +3,7 @@ import json
 import os
 import h5py
 import numpy as np
-from sklearn.metrics import normalized_mutual_info_score
+from sklearn.metrics import normalized_mutual_info_score, f1_score, precision_score, accuracy_score, recall_score
 from tqdm import tqdm
 import torch
 from sklearn.preprocessing import LabelEncoder
@@ -339,6 +339,14 @@ def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray,
             neighbours_pred.append(n_label)
 
     return neighbours_true, neighbours_pred
+
+def correlation_metrics(y_true, y_pred):
+    f1 = f1_score(y_true, y_pred, average='macro')
+    precision = precision_score(y_true, y_pred, average='macro')
+    acc = accuracy_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred, average='macro')
+
+    return f1, precision, recall, acc
 
 def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: int = 5) -> dict:
     """

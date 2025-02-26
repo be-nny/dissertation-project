@@ -11,7 +11,7 @@ import logger
 import model
 
 from matplotlib import pyplot as plt
-from sklearn.metrics import confusion_matrix, homogeneity_score, silhouette_score, calinski_harabasz_score
+from sklearn.metrics import confusion_matrix, homogeneity_score, silhouette_score, calinski_harabasz_score, f1_score
 from model import utils, models
 from plot_lib import plotter, interactive_plotter
 from preprocessor import preprocessor as p, signal_processor as sp
@@ -155,10 +155,12 @@ if __name__ == "__main__":
     tqdm_loop = tqdm(n_neighbours_total, desc="Computing correlation matrices", unit="iter")
     for n_neighbours in tqdm_loop:
         t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
+        f1, precision, recall, acc = utils.correlation_metrics(t_corr, p_corr)
+
         cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
         class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
         path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat.pdf"
-        plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path)
+        plotter.plot_correlation(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path, f1_score=f1, recall=recall, precision=precision, accuracy=acc)
 
     # plot correlation accuracy
     path = f"{root}/correlation_accuracy.pdf"

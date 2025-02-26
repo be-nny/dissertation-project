@@ -315,10 +315,16 @@ def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, cova
     plt.close()
 
 
-def plot_correlation(cf_matrix, class_labels, n_neighbours, path):
+def plot_correlation(cf_matrix, class_labels, n_neighbours, path, **kwargs):
+    f1 = kwargs["f1_score"]
+    precision = kwargs["precision"]
+    recall = kwargs["recall"]
+    accuracy = kwargs["accuracy"]
+    metrics_str = f"Accuracy: {accuracy:.2%}, Precision: {precision:.2%}, Recall: {recall:.2%}, F1 Score: {f1:.2%}"
+
     sns.heatmap(cf_matrix, annot=True, fmt="d", xticklabels=class_labels, yticklabels=class_labels)
     plt.xlabel("Predicted Neighbour Labels")
     plt.ylabel("True Label")
-    plt.title(f"Confusion Matrix of the {n_neighbours} Nearest Neighbours Genre Labels")
+    plt.title(f"Confusion Matrix when nearest_neighbours={n_neighbours} \n{metrics_str}")
     plt.savefig(path, bbox_inches='tight')
     plt.close()
