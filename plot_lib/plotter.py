@@ -305,7 +305,7 @@ def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, cova
     tqdm_loop = tqdm(range(1, max_n_neighbours + 1), desc="Computing correlation scores", unit="iter")
     for n in tqdm_loop:
         t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=covariance_mat, n_neighbours=n)
-        acc = accuracy_score(y_true, t_corr)
+        acc = accuracy_score(t_corr, p_corr)
         accuracy_scores.append(acc)
 
     plt.plot(range(1, max_n_neighbours + 1), accuracy_scores, label="Accuracy")
