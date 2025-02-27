@@ -56,6 +56,7 @@ class Loader:
         self.input_shape = None
         self.dataloader = None
         self.split_type = None
+
         self.loaded_files = []
         self.batch_size = batch_size
         self.label_encoder = LabelEncoder()
@@ -135,6 +136,17 @@ class Loader:
         self.input_shape = np.array(data[0]).shape
         del data
         return self.dataloader
+
+    def all(self):
+        flattened_data = []
+        flattened_y_true = []
+        for x, y in self.dataloader:
+            x = x.numpy()
+            flattened = [i.flatten() for i in x]
+            flattened_data.extend(flattened)
+            flattened_y_true.extend(y)
+
+        return np.array(flattened_data), np.array(flattened_y_true)
 
     def encode_label(self, labels):
         """
@@ -288,7 +300,7 @@ def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred:
 
     return custom_points
 
-def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader, logger) -> dict:
+def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader) -> dict:
     """
     Creates a dictionary containing which clusters have what genre in them. Each genre has a count of the number of samples in that cluster with that genre tag
 
@@ -297,11 +309,9 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader, l
     :param loader: dataset loader
     :return: the cluster statistics
     """
-    # nmi score
-    nmi = normalized_mutual_info_score(y_true, y_pred)
-    logger.info(f"NMI score: {nmi}")
 
     cluster_stats = {}
+
     # convert the encoded labels back to strings
     y_true = loader.decode_label(y_true)
     for i in range(0, len(y_pred)):
@@ -314,7 +324,6 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader, l
         cluster_stats[y_pred[i]][y_true[i]] += 1
 
     return cluster_stats
-
 
 def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray, n_neighbours: int = 5):
     """

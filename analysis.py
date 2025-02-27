@@ -10,6 +10,7 @@ import logger
 from plot_lib.plotter import *
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
 from model import utils
 
 matplotlib.use('TkAgg')
@@ -26,7 +27,8 @@ parser.add_argument("-i", "--info", action="store_true", help="Returns a list of
 parser.add_argument("-e", "--eigen", type=int, help="Plots the eigenvalues obtained after performing PCA. Takes value for max n_components")
 parser.add_argument("-k", "--kmeans", help="Plots 2D Kmeans Boundaries of UMAP or PCA. '-nc' must be set for the number of clusters. '-g' must also be set.")
 parser.add_argument("-t", "--inertia", help="Plots number of clusters against kmeans inertia score for UMAP or PCA. '-g' must also be set. '-nc' must be set for the max. number of clusters")
-parser.add_argument("-v2", "--visualise2d", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
+parser.add_argument("-v", "--visualise", help="Plots 2D Latent Space of UMAP or PCA. '-g' must also be set.")
+parser.add_argument("-rf", "--random_forest", help="Uses a Random Forest model to classify the data")
 
 BATCH_SIZE = 512
 
@@ -48,16 +50,6 @@ def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
 
             logger.info(out_str)
 
-def load_flatten(batch_loader):
-    flattened_data = []
-    flattened_y_true = []
-    for x, y in batch_loader:
-        x = x.numpy()
-        flattened = [i.flatten() for i in x]
-        flattened_data.extend(flattened)
-        flattened_y_true.extend(y)
-
-    return np.array(flattened_data), np.array(flattened_y_true)
 
 def get_dim_model(model_type):
     seed = 42
@@ -108,12 +100,13 @@ if __name__ == "__main__":
             pca_model = PCA(n_components=args.eigen)
 
             batch_loader = loader.load(split_type="all", normalise=True)
-            data, y_true = load_flatten(batch_loader)
+            data, y_true = loader.all()
             pca_model.fit(data)
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_eigenvalues.pdf")
 
             title = f"PCA Eigenvalues (log scale) with {signal_processor} applied"
-            plot_eigenvalues(path=path, pca_model=pca_model, logger=logger, title=title)
+            plot_eigenvalues(path=path, pca_model=pca_model, title=title)
+            logger.info(f"Saved plot '{path}'")
 
         if args.kmeans:
             experiments_dir = os.path.join(experiments_dir_root, "kmeans-boundary-plots")
@@ -122,9 +115,9 @@ if __name__ == "__main__":
 
             _, genre_filter = get_genre_filter(args.genres)
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+            loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
-            data, y_true = load_flatten(batch_loader)
+            data, y_true = loader.all()
             dim_model = get_dim_model(args.kmeans)
 
             latent = dim_model.fit_transform(data).astype(np.float64)
@@ -132,14 +125,16 @@ if __name__ == "__main__":
             y_pred = kmeans.fit_predict(latent)
 
             # plot boundaries
-            path1 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_kmeans_boundaries_{args.n_clusters}.pdf")
+            path1 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.kmeans.lower()}_{args.genres}_kmeans_boundaries_{args.n_clusters}.pdf")
             title = f"K-Means cluster boundaries with {signal_processor} applied"
-            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, logger=logger, path=path1, genre_filter=args.genres, title=title)
+            plot_2d_kmeans_boundaries(kmeans=kmeans, latent_space=latent, path=path1, genre_filter=args.genres, title=title)
+            logger.info(f"Saved plot '{path1}'")
 
             # plot genre spread
             stats = utils.cluster_statistics(y_true=np.array(y_true), y_pred=np.array(y_pred), loader=loader)
-            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.boundaries.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
-            plot_tree_map(cluster_stats=stats, path=path2, logger=logger)
+            path2 = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.kmeans.lower()}_{args.genres}_tree_plot_{args.n_clusters}.pdf")
+            plot_tree_map(cluster_stats=stats, path=path2)
+            logger.info(f"Saved plot '{path2}'")
 
         if args.inertia:
             experiments_dir = os.path.join(experiments_dir_root, "kmeans-inertia-plots")
@@ -148,29 +143,56 @@ if __name__ == "__main__":
 
             n_genres, genre_filter = get_genre_filter(args.genres)
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
-            data, y_true = load_flatten(batch_loader)
+            loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+            data, y_true = loader.all()
             dim_model = get_dim_model(args.inertia)
 
             latent_space = dim_model.fit_transform(data)
             max_clusters = args.n_clusters
             path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.inertia.lower()}_{args.genres}_kmeans_inertia.pdf")
             title = f"KMeans Inertia with {signal_processor} applied"
-            plot_inertia(latent_space=latent_space, max_clusters=max_clusters, logger=logger, n_genres=n_genres, path=path, title=title)
+            plot_inertia(latent_space=latent_space, max_clusters=max_clusters, n_genres=n_genres, path=path, title=title)
+            logger.info(f"Saved plot '{path}'")
 
-        if args.visualise2d:
+        if args.visualise:
             experiments_dir = os.path.join(experiments_dir_root, "latent-plots")
             if not os.path.exists(experiments_dir):
                 os.mkdir(experiments_dir)
 
             _, genre_filter = get_genre_filter(args.genres)
             loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+            loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
-            data, y_true = load_flatten(batch_loader)
-            dim_model = get_dim_model(args.visualise2d)
+            data, y_true = loader.all()
+            dim_model = get_dim_model(args.visualise)
             latent = dim_model.fit_transform(data)
 
-            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise2d.lower()}_{args.genres}_visualisation_2D.pdf")
-            title = f"Latent Space in 2D with {signal_processor} applied using {args.visualise2d.lower()}"
-            plot_2D(latent_space=latent, y_true=y_true, logger=logger, path=path, genre_filter=args.genres, loader=loader, title=title)
+            path = os.path.join(experiments_dir, f"{args.uuid}_{signal_processor}_{args.visualise.lower()}_{args.genres}_visualisation_2D.pdf")
+            title = f"Latent Space in 2D with {signal_processor} applied using {args.visualise.lower()}"
+            plot_2D(latent_space=latent, y_true=y_true, path=path, genre_filter=args.genres, loader=loader, title=title)
+            logger.info(f"Saved plot '{path}'")
+
+        if args.random_forest:
+            experiments_dir = os.path.join(experiments_dir_root, "random-forest")
+            if not os.path.exists(experiments_dir):
+                os.mkdir(experiments_dir)
+
+            _, genre_filter = get_genre_filter(args.genres)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+            dim_model = get_dim_model(args.random_forest)
+
+            # training
+            loader.load(split_type="train", normalise=True, genre_filter=genre_filter, flatten=True)
+            train_data, y_train = loader.all()
+            latent_train = dim_model.fit_transform(train_data)
+
+            rf_model = RandomForestClassifier(random_state=0)
+            rf_model.fit(latent_train, y_train)
+
+            # testing
+            loader.load(split_type="test", normalise=True, genre_filter=genre_filter, flatten=True)
+            test_data, y_test = loader.all()
+            latent_test = dim_model.fit_transform(test_data)
+            y_pred = rf_model.predict(latent_test)
+            acc = accuracy_score(y_test, y_pred)
+            logger.info(f"Random Forest Accuracy: {acc}")

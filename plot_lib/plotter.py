@@ -61,14 +61,13 @@ def plot_tree_map(cluster_stats: dict, path: str) -> None:
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
-def plot_2d_kmeans_boundaries(latent_space: np.ndarray, kmeans, logger, path: str, title: str, genre_filter: str, h: float = 0.02) -> None:
+def plot_2d_kmeans_boundaries(latent_space: np.ndarray, kmeans, path: str, title: str, genre_filter: str, h: float = 0.02) -> None:
     """
     Plots the kmeans decision boundaries
 
     :param title: title
     :param latent_space: 2D latetn space
     :param kmeans: KMeans object
-    :param logger: logger
     :param path: path to save
     :param genre_filter: genre filter
     :param h: step size for the grid used to create the mesh for plotting the decision boundaries
@@ -110,15 +109,13 @@ def plot_2d_kmeans_boundaries(latent_space: np.ndarray, kmeans, logger, path: st
     colorbar.set_ticklabels([f"Cluster {i}" for i in range(kmeans.n_clusters)])
     plt.title(title)
     plt.savefig(path, bbox_inches='tight')
-    logger.info(f"Saved plot '{path}'")
 
-def plot_eigenvalues(path, pca_model, logger, title) -> None:
+def plot_eigenvalues(path, pca_model, title) -> None:
     """
     Plot eigenvalues after pca transformation
 
     :param path: path to save figure
     :param pca_model: pca model
-    :param logger: logger
     :param title: title
     """
 
@@ -129,7 +126,6 @@ def plot_eigenvalues(path, pca_model, logger, title) -> None:
     plt.title(title)
     plt.savefig(path, bbox_inches='tight')
     plt.close()
-    logger.info(f"Saved plot '{path}'")
 
 def plot_3D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str, logger, genre_filter: str, loader) -> None:
     """
@@ -166,7 +162,7 @@ def plot_3D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,
     plt.savefig(path, bbox_inches='tight')
     logger.info(f"Saved plot '{path}'")
 
-def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,logger, genre_filter: str, loader) -> None:
+def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str, genre_filter: str, loader) -> None:
     """
     Plots a 2 dimensional latent representation in 2D space
 
@@ -198,7 +194,6 @@ def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,
     ax.grid(False)
     plt.title(title)
     plt.savefig(path, bbox_inches='tight')
-    logger.info(f"Saved plot '{path}'")
 
 def draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
     """
@@ -261,7 +256,7 @@ def plot_gmm(gmm, X, labels, path, logger, title, ax=None) -> None:
     plt.savefig(path, bbox_inches='tight')
     logger.info(f"Saved plot '{path}'")
 
-def plot_inertia(latent_space, logger, path, title, max_clusters=20, n_genres=10) -> None:
+def plot_inertia(latent_space, path, title, max_clusters=20, n_genres=10) -> None:
     """
     Plot inertia graph for kmeans.
 

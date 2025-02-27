@@ -64,31 +64,6 @@ def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
 
             logger.info(out_str)
 
-def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: model.utils.Loader) -> dict:
-    """
-    Creates a dictionary containing which clusters have what genre in them. Each genre has a count of the number of samples in that cluster with that genre tag
-
-    :param y_true: true label values
-    :param y_pred: predicted label values
-    :param loader: dataset loader
-    :return: the cluster statistics
-    """
-
-    cluster_stats = {}
-
-    # convert the encoded labels back to strings
-    y_true = loader.decode_label(y_true)
-    for i in range(0, len(y_pred)):
-        if y_pred[i] not in cluster_stats:
-            cluster_stats.update({y_pred[i]: {}})
-
-        if y_true[i] not in cluster_stats[y_pred[i]]:
-            cluster_stats[y_pred[i]].update({y_true[i]: 0})
-
-        cluster_stats[y_pred[i]][y_true[i]] += 1
-
-    return cluster_stats
-
 def fit_new(new_file_path: str, model: models.GMMLearner, signal_func_name: str, segment_duration: int, sample_rate: int, fig: plt.Figure, ax: plt.Axes):
     file_name = os.path.basename(new_file_path).strip().replace("_", " ")
 
@@ -169,7 +144,7 @@ if __name__ == "__main__":
     logger.info(f"Saved plot '{path}'")
 
     # get cluster stats for tree maps
-    cluster_stats = cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+    cluster_stats = utils.cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
 
     # find the largest genre per cluster
     prominent_cluster_genre = {}
@@ -190,14 +165,6 @@ if __name__ == "__main__":
     title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
     ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
     logger.info(f"Saved plot '{path}'")
-
-    # fit new song to plot the 'song evolution'
-    if args.fit_new_song:
-        fit_new(new_file_path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
-        file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
-        path = f"{root}/gaussian_plot_with_{file_name}.pdf"
-        plt.savefig(path)
-        logger.info(f"Saved plot '{path}'")
 
     # create graph for shortest path
     graph = utils.connected_graph(latent_space, inv_covar)
@@ -240,8 +207,16 @@ if __name__ == "__main__":
         path = f"{root}/gaussian_plot_shortest_path.pdf"
         plt.savefig(path)
         logger.info(f"Saved plot '{path}'")
+        plt.autoscale()
 
-    plt.autoscale()
+    if args.fit_new_song:
+        # fit new song to plot the 'song evolution'
+        fit_new(new_file_path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
+        file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
+        path = f"{root}/gaussian_plot_with_{file_name}.pdf"
+        plt.savefig(path)
+        logger.info(f"Saved plot '{path}'")
+
     logger.info("Displaying Window")
 
     prom_genres = "Most Common Genre per Cluster: \n" + '\n'.join([f"> Cluster {k}: {v}" for k, v in prominent_cluster_genre.items()])
