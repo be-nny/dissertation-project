@@ -19,7 +19,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - EXPERIMENTS', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use")
-parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters")
+parser.add_argument("-n", "--n_clusters", type=int, help="number of clusters")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
@@ -125,7 +125,7 @@ if __name__ == "__main__":
             batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
 
             data, y_true = load_flatten(batch_loader)
-            dim_model = get_dim_model(args.boundaries)
+            dim_model = get_dim_model(args.kmeans)
 
             latent = dim_model.fit_transform(data).astype(np.float64)
             kmeans = KMeans(n_clusters=args.n_clusters)

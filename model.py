@@ -1,4 +1,5 @@
 import argparse
+import copy
 import os
 import random
 
@@ -96,7 +97,7 @@ def fit_new(new_file_path: str, model: models.GMMLearner, signal_func_name: str,
 
     # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
-    overlap_ratio = 0.1
+    overlap_ratio = 0.5
     signal_func_width = segment_data.shape[-1]
 
     stride = int(signal_func_width * overlap_ratio)
@@ -190,6 +191,14 @@ if __name__ == "__main__":
     ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
     logger.info(f"Saved plot '{path}'")
 
+    # fit new song to plot the 'song evolution'
+    if args.fit_new_song:
+        fit_new(new_file_path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
+        file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
+        path = f"{root}/gaussian_plot_with_{file_name}.pdf"
+        plt.savefig(path)
+        logger.info(f"Saved plot '{path}'")
+
     # create graph for shortest path
     graph = utils.connected_graph(latent_space, inv_covar)
     start_point = latent_space[np.random.randint(len(latent_space))]
@@ -229,14 +238,6 @@ if __name__ == "__main__":
         # save
         plt.legend()
         path = f"{root}/gaussian_plot_shortest_path.pdf"
-        plt.savefig(path)
-        logger.info(f"Saved plot '{path}'")
-
-    # fit new song to plot the 'song evolution'
-    if args.fit_new_song:
-        ax, fig = fit_new(new_file_path=args.fit_new_song, model=gmm_model, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
-        file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
-        path = f"{root}/gaussian_plot_with_{file_name}.pdf"
         plt.savefig(path)
         logger.info(f"Saved plot '{path}'")
 
