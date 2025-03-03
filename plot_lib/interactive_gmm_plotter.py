@@ -1,3 +1,4 @@
+import os.path
 from functools import partial
 
 from model.utils import CustomPoint
@@ -57,12 +58,12 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title, path) -> (plt.Ax
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
 
-    callback = partial(_show_nearest_neighbours, fig=fig, ax=ax, data_points=data_points)
+    callback = partial(_show_nearest_neighbours, fig=fig, ax=ax, data_points=data_points, path=path)
     fig.canvas.mpl_connect('pick_event', callback)
     plt.savefig(path, bbox_inches='tight')
     return ax, fig
 
-def _show_nearest_neighbours(event, fig, ax, data_points):
+def _show_nearest_neighbours(event, fig, ax, data_points, path):
     """
     Shows the nearest neighbours when a point is clicked on the canvas
 
@@ -79,5 +80,9 @@ def _show_nearest_neighbours(event, fig, ax, data_points):
 
             ax.annotate(f"{name}", (point[0], point[1]), textcoords="offset points", xytext=(0,3), ha='center', fontsize=8, alpha=0.5)
             ax.plot([data_points[i].x, point[0]], [data_points[i].y, point[1]], color='black')
+            root = os.path.dirname(path)
 
+    file_name = data_points[0].nearest_neighbours[0][2]
+    file_path = os.path.join(root, f"{file_name}_nearest_neighbours.pdf")
+    plt.savefig(file_path, bbox_inches='tight')
     fig.canvas.draw()

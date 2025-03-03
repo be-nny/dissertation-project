@@ -1,5 +1,5 @@
-import numpy as np
 import umap.umap_ as umap
+import numpy as np
 from sklearn.mixture import GaussianMixture
 
 LATENT_DIMS = 2
@@ -23,13 +23,7 @@ class GMMLearner:
         to the data to cluster the latent points.
         """
 
-        tmp = []
-        self.y_true = []
-        for x, y in self.loader:
-            x = x.numpy()
-            tmp.extend(x)
-            self.y_true.extend(y)
-
+        tmp, self.y_true = self.loader.all()
         self.latent_data = self.umap_model.fit_transform(tmp).astype(np.float64)
         self.y_pred = self.gaussian_model.fit_predict(self.latent_data)
 

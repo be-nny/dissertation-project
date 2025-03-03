@@ -14,7 +14,7 @@ import model
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix, homogeneity_score, silhouette_score, calinski_harabasz_score, f1_score
 from model import utils, models
-from plot_lib import plotter, interactive_plotter
+from plot_lib import plotter, interactive_gmm_plotter
 from preprocessor import preprocessor as p, signal_processor as sp
 
 matplotlib.use('TkAgg')
@@ -117,10 +117,10 @@ if __name__ == "__main__":
     # create a dataloader
     _, genre_filter = get_genre_filter(args.genres)
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
-    batch_loader = loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
+    loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
     # create metric learner (gaussian mixture model)
-    gmm_model = models.GMMLearner(loader=batch_loader, n_clusters=args.n_clusters)
+    gmm_model = models.GMMLearner(loader=loader, n_clusters=args.n_clusters)
     gmm_model.create_latent()
     latent_space, y_pred, y_true = gmm_model.get_latent(), gmm_model.get_y_pred(), gmm_model.get_y_true()
     covar = gmm_model.gaussian_model.covariances_[0]
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=inv_covar)
     path = f"{root}/gaussian_plot.pdf"
     title = f"Gaussian mixture model cluster boundaries with {signal_processor} applied"
-    ax, fig = interactive_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
+    ax, fig = interactive_gmm_plotter.interactive_gmm(gmm=gmm_model.gaussian_model, data_points=data_points, title=title, path=path)
     logger.info(f"Saved plot '{path}'")
 
     # create graph for shortest path

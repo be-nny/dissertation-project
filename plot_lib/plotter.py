@@ -291,7 +291,6 @@ def plot_inertia(latent_space, path, title, max_clusters=20, n_genres=10) -> Non
     plt.title(title)
     plt.legend()
     plt.savefig(path, bbox_inches='tight')
-    logger.info(f"Saved plot '{path}'")
     plt.close()
 
 def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path, max_n_neighbours: int = 100) -> None:
@@ -311,8 +310,7 @@ def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, cova
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
-
-def plot_correlation(cf_matrix, class_labels, n_neighbours, path, **kwargs):
+def plot_correlation(cf_matrix, class_labels, n_neighbours, path, **kwargs) -> None:
     f1 = kwargs["f1_score"]
     precision = kwargs["precision"]
     recall = kwargs["recall"]
@@ -325,3 +323,22 @@ def plot_correlation(cf_matrix, class_labels, n_neighbours, path, **kwargs):
     plt.title(f"Confusion Matrix when nearest_neighbours={n_neighbours} \n{metrics_str}")
     plt.savefig(path, bbox_inches='tight')
     plt.close()
+
+def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> None:
+    x = np.arange(len(classifier_labels))
+    width = 0.1
+    multiplier = 0
+
+    fig, ax = plt.subplots(layout="constrained")
+
+    for signal_processor, accuracy_scores in data.items():
+        offset = width * multiplier
+        rects = ax.bar(x + offset, accuracy_scores, width, label=signal_processor)
+        ax.bar_label(rects, padding=3, fmt="%.0f")
+        multiplier += 1
+
+    ax.set_ylabel("Accuracy Scores")
+    ax.set_title("Classifier Accuracy Scores per Signal Processor")
+    ax.set_xticks(x + width, classifier_labels)
+    ax.legend()
+    plt.show()
