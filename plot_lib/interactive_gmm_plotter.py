@@ -82,7 +82,7 @@ def _show_nearest_neighbours(event, fig, ax, data_points, path):
             ax.plot([data_points[i].x, point[0]], [data_points[i].y, point[1]], color='black')
             root = os.path.dirname(path)
 
-    file_name = data_points[0].nearest_neighbours[0][2]
-    file_path = os.path.join(root, f"{file_name}_nearest_neighbours.pdf")
-    plt.savefig(file_path, bbox_inches='tight')
+        file_name = data_points[i].nearest_neighbours[0][2]
+        file_path = os.path.join(root, f"{file_name}_nearest_neighbours.pdf")
+        plt.savefig(file_path, bbox_inches='tight')
     fig.canvas.draw()

@@ -50,9 +50,9 @@ def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
     :param config: config file
     """
     datasets = os.listdir(config.OUTPUT_PATH)
-
+    ignore = ["experiments", "gaussian_model", "analysis"]
     for uuid in datasets:
-        if uuid[0] != "." and uuid != "experiments" and uuid != "models":
+        if uuid[0] != "." and uuid not in ignore:
             path = os.path.join(config.OUTPUT_PATH, uuid)
             receipt_file = os.path.join(path, "receipt.json")
             with utils.ReceiptReader(filename=receipt_file) as receipt_reader:
@@ -110,7 +110,7 @@ if __name__ == "__main__":
             pca_model.fit(data)
             path = os.path.join(experiments_dir, f"{args.uuid}_{loader.signal_processor}_eigenvalues.pdf")
 
-            title = f"PCA Eigenvalues (log scale) with {loader.signal_processor} applied"
+            title = f"PCA Eigenvalues (log scale) with {loader.signal_processor} applied \n Total features: {pca_model.n_features_in_}"
             plot_eigenvalues(path=path, pca_model=pca_model, title=title)
             logger.info(f"Saved plot '{path}'")
 
