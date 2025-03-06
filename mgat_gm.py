@@ -1,16 +1,11 @@
 import argparse
-import copy
-import os
-import random
-
 import matplotlib
 import numpy as np
-from tqdm import tqdm
-
-import config
 import logger
 import model
 
+from tqdm import tqdm
+from utils import *
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix, homogeneity_score, silhouette_score, calinski_harabasz_score, f1_score
 from model import utils, models
@@ -27,42 +22,6 @@ parser.add_argument("-f", "--fit_new_song", help="Fit a new song")
 parser.add_argument("-p", "--path", action="store_true", help="Plots the shortest path between two random starting points")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
 parser.add_argument("-n", "--n_clusters", type=int, help="The number of clusters to find")
-
-def get_genre_filter(genres_arg: str) -> tuple[int, list]:
-    """
-    Formats a genre filter string
-
-    :param genres_arg: genre filter from CLI arg
-    :return: number of genres, formatted genre list
-    """
-
-    if genres_arg != "all":
-        genre_filter = genres_arg.replace(" ", "").split(",")
-        n_genres = len(genre_filter)
-    else:
-        genre_filter = []
-        n_genres = 10
-
-    return n_genres, genre_filter
-
-def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
-    """
-    Shows all available datasets to in the output directory in 'config.yml'
-
-    :param logger: logger
-    :param config: config file
-    """
-
-    datasets = os.listdir(config.OUTPUT_PATH)
-
-    for uuid in datasets:
-        if uuid[0] != "." and uuid != "experiments":
-            path = os.path.join(config.OUTPUT_PATH, uuid)
-            receipt_file = os.path.join(path, "receipt.json")
-            with utils.ReceiptReader(filename=receipt_file) as receipt_reader:
-                out_str = f"{uuid} - {receipt_reader.signal_processor:<15} SAMPLE SIZE: {receipt_reader.total_samples:<5} SEGMENT DURATION:{receipt_reader.seg_dur:<5} CREATED:{receipt_reader.created_time:<10}"
-
-            logger.info(out_str)
 
 def fit_new(new_file_path: str, model: models.GMMLearner, signal_func_name: str, segment_duration: int, sample_rate: int, fig: plt.Figure, ax: plt.Axes):
     file_name = os.path.basename(new_file_path).strip().replace("_", " ")
@@ -219,7 +178,7 @@ if __name__ == "__main__":
 
     logger.info("Displaying Window")
 
-    prom_genres = "Most Common Genre per Cluster: \n" + '\n'.join([f"> Cluster {k}: {v}" for k, v in prominent_cluster_genre.items()])
+    prom_genres = "Most Common Genre per Cluster: " + [f"{k}: {v}" for k, v in prominent_cluster_genre.items()].split(", ")
     logger.info(prom_genres)
     logger.info(f"Homogeneity Score: {homogeneity_score(y_true, y_pred)}")
     logger.info(f"Calinski Harabasz Score: {calinski_harabasz_score(latent_space, y_pred)}")

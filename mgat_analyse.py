@@ -1,7 +1,7 @@
-import os
 import argparse
-import os.path
+import logger
 import umap.umap_ as umap
+
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
@@ -9,14 +9,9 @@ from sklearn.manifold import TSNE
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-
-import config
-import logger
-
+from utils import *
 from plot_lib.plotter import *
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -42,25 +37,6 @@ parser.add_argument("-cl", "--classifier", help="Uses a Random Forest model to c
 
 BATCH_SIZE = 512
 
-def show_info(logger: logger.logging.Logger, config: config.Config) -> None:
-    """
-    Shows all available datasets to in the output directory in 'config.yml'
-
-    :param logger: logger
-    :param config: config file
-    """
-    datasets = os.listdir(config.OUTPUT_PATH)
-    ignore = ["experiments", "gaussian_model", "analysis"]
-    for uuid in datasets:
-        if uuid[0] != "." and uuid not in ignore:
-            path = os.path.join(config.OUTPUT_PATH, uuid)
-            receipt_file = os.path.join(path, "receipt.json")
-            with utils.ReceiptReader(filename=receipt_file) as receipt_reader:
-                out_str = f"{uuid} - {receipt_reader.signal_processor:<15} SAMPLE SIZE: {receipt_reader.total_samples:<5} SEGMENT DURATION:{receipt_reader.seg_dur:<5} CREATED:{receipt_reader.created_time:<10}"
-
-            logger.info(out_str)
-
-
 def get_dim_model(model_type):
     seed = 42
     if model_type.lower() == "pca":
@@ -71,16 +47,6 @@ def get_dim_model(model_type):
         return TSNE(n_components=2, random_state=seed)
     else:
         raise TypeError("Model type must be 'pca' or 'umap' or 'tsne'")
-
-def get_genre_filter(genres_arg):
-    if genres_arg != "all":
-        genre_filter = genres_arg.replace(" ", "").split(",")
-        n_genres = len(genre_filter)
-    else:
-        genre_filter = []
-        n_genres = 10
-
-    return n_genres, genre_filter
 
 if __name__ == "__main__":
     args = parser.parse_args()
