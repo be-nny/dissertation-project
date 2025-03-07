@@ -17,6 +17,11 @@ class RunningStats:
         self.var = None
 
     def update(self, val):
+        """
+        Computing moving average
+
+        :param val: loss value
+        """
         if self.mean is None:
             self.mean = val
             self.var = torch.zeros_like(val)
@@ -24,7 +29,11 @@ class RunningStats:
             self.mean = self.momentum * self.mean + (1 - self.momentum) * val
             self.var = self.momentum * self.var + (1 - self.momentum) * (val-self.mean)**2
 
-    def stats(self):
+    def stats(self) -> tuple:
+        """
+        :return: mean and standard deviation
+        """
+
         std = torch.sqrt(self.var + 1e-8)
         return self.mean, std
 
