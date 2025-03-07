@@ -28,7 +28,18 @@ class RunningStats:
         std = torch.sqrt(self.var + 1e-8)
         return self.mean, std
 
-def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str) -> None:
+def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str) -> None:
+    """
+    Trains a convolutional autoencoder, ready for the DEC model.
+
+    :param epochs: number of training epochs
+    :param autoencoder: autoencoder model
+    :param batch_loader: batch loader
+    :param batch_size: batch size
+    :param logger: logger
+    :param path: path to save model
+    """
+
     if torch.cuda.is_available():
         logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
     else:
@@ -77,11 +88,13 @@ def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loade
     logger.info(f"Saved weights to '{path}'")
 
 
-def train_dec(epochs, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger, path: str) -> None:
+def train_dec(epochs: int, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger, path: str) -> None:
     """
-    Trains a Deep Embedded Clustering implementation using a pre trained convolutional autoencoder.
+    Trains a Deep Embedded Clustering implementation using a pre-trained convolutional autoencoder. The loss function
+    is a combination of the reconstruction loss of the convolutional autoencoder, and the KL divergence. These values
+    are scaled so that they contribute equally to the total loss govenered by the moving average and std.
 
-    :param epochs: training epochs
+    :param epochs: number of training epochs
     :param dec: DEC instance
     :param batch_loader: batch loader
     :param logger: logger
