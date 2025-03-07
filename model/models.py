@@ -66,7 +66,7 @@ class GMMLearner:
         """
         return self.y_true
 
-def _target_distribution(assignments):
+def target_distribution(assignments):
     """
     This sharpens the predicted probabilities to focuses more confident assignments
     :param assignments: soft assignments

@@ -2,9 +2,31 @@ import numpy as np
 import torch
 import logging
 
-from torch import nn
+from torch import nn, optim
 from tqdm import tqdm
 from model import models, utils
+
+class RunningStats:
+    """
+    Keeps track of the moving average of a loss function. This is used when combining two or more loss functions so that
+    their values both contribute equally to the loss function.
+    """
+    def __init__(self, momentum=0.99):
+        self.momentum = momentum
+        self.mean = None
+        self.var = None
+
+    def update(self, val):
+        if self.mean is None:
+            self.mean = val
+            self.var = torch.zeros_like(val)
+        else:
+            self.mean = self.momentum * self.mean + (1 - self.momentum) * val
+            self.var = self.momentum * self.var + (1 - self.momentum) * (val-self.mean)**2
+
+    def stats(self):
+        std = torch.sqrt(self.var + 1e-8)
+        return self.mean, std
 
 def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str):
     if torch.cuda.is_available():
@@ -28,7 +50,6 @@ def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loade
     tqdm_loop = tqdm(range(epochs), desc="Training Conv Autoencoder", unit="epoch")
     for epoch in tqdm_loop:
         losses = []
-
         for x, y in batch_loader:
             autoencoder.zero_grad()
 
@@ -54,4 +75,63 @@ def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loade
     logger.info(f"Training complete! Best loss: {best_loss[0]}")
     torch.save(autoencoder.state_dict(), path)
     logger.info(f"Saved weights to '{path}'")
+
+
+def train_dec(epochs, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger):
+    if torch.cuda.is_available():
+        logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
+    else:
+        logger.info("No GPU available. Training will run on CPU.")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dec.train()
+
+    # moving mean/std trackers
+    recon_stats = RunningStats()
+    kl_stats = RunningStats()
+
+    # training parameters
+    lr = 1e-3
+    optimiser = torch.optim.AdamW(dec.parameters(), lr, weight_decay=1e-2)
+    kl_loss_fn = nn.KLDivLoss(reduction='batchmean')
+    recon_loss_fn = nn.MSELoss()
+
+    loss_vals = []
+    best_loss = (np.inf, 0)
+
+    tqdm_loop = tqdm(range(epochs), desc="Training DEC", unit="epoch")
+
+    for epoch in tqdm_loop:
+        losses = []
+        for x, y in batch_loader:
+            optimiser.zero_grad()
+            x = x.to(device)
+            q, latent_space, reconstructed = dec(x)
+            p = models.target_distribution(q)
+
+            if reconstructed.shape[-1] != x.shape[-1]:
+                reconstructed = nn.functional.interpolate(reconstructed, size=(x.shape[-1],), mode="nearest")
+
+            kl_loss = kl_loss_fn(torch.log(q), p.detach())
+            recon_loss = recon_loss_fn(reconstructed, x)
+
+            # scale both loss values equally
+            recon_stats.update(recon_loss.detach())
+            kl_stats.update(kl_loss.detach())
+            recon_mean, recon_std = recon_stats.stats()
+            kl_mean, kl_std = kl_stats.stats()
+            norm_recon = (recon_loss - recon_mean) / (recon_std + 1e-8)
+            norm_kl = (kl_loss - kl_mean) / (kl_std + 1e-8)
+
+            loss = norm_recon + norm_kl
+            losses.append(loss.item())
+            loss.backward()
+            optimiser.step()
+
+        mean_loss = np.mean(losses)
+        if mean_loss < best_loss[0]:
+            best_loss = (mean_loss, epoch)
+
+        loss_vals.append(mean_loss)
+        tqdm_loop.set_description(f"Training - Loss={mean_loss}")
 
