@@ -29,9 +29,9 @@ def show_info(logger: logging.Logger, config: config.Config) -> None:
     """
 
     datasets = os.listdir(config.OUTPUT_PATH)
-
+    exclude = ["experiments", "gaussian_model", "dec", "analysis"]
     for uuid in datasets:
-        if uuid[0] != "." and uuid != "experiments":
+        if uuid[0] != "." and uuid not in exclude:
             path = os.path.join(config.OUTPUT_PATH, uuid)
             receipt_file = os.path.join(path, "receipt.json")
             with model_utils.ReceiptReader(filename=receipt_file) as receipt_reader:
