@@ -28,7 +28,7 @@ class RunningStats:
         std = torch.sqrt(self.var + 1e-8)
         return self.mean, std
 
-def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str):
+def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str) -> None:
     if torch.cuda.is_available():
         logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
     else:
@@ -77,7 +77,17 @@ def train_autoencoder(epochs, autoencoder: models.Conv1DAutoencoder, batch_loade
     logger.info(f"Saved weights to '{path}'")
 
 
-def train_dec(epochs, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger):
+def train_dec(epochs, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger, path: str) -> None:
+    """
+    Trains a Deep Embedded Clustering implementation using a pre trained convolutional autoencoder.
+
+    :param epochs: training epochs
+    :param dec: DEC instance
+    :param batch_loader: batch loader
+    :param logger: logger
+    :param path: path to save model
+    """
+
     if torch.cuda.is_available():
         logger.info(f"GPU: {torch.cuda.get_device_name(0)} is available.")
     else:
@@ -115,7 +125,7 @@ def train_dec(epochs, dec: models.DEC, batch_loader: utils.DataLoader, logger: l
             kl_loss = kl_loss_fn(torch.log(q), p.detach())
             recon_loss = recon_loss_fn(reconstructed, x)
 
-            # scale both loss values equally
+            # scale both loss values equally with moving average tracker
             recon_stats.update(recon_loss.detach())
             kl_stats.update(kl_loss.detach())
             recon_mean, recon_std = recon_stats.stats()
@@ -135,3 +145,6 @@ def train_dec(epochs, dec: models.DEC, batch_loader: utils.DataLoader, logger: l
         loss_vals.append(mean_loss)
         tqdm_loop.set_description(f"Training - Loss={mean_loss}")
 
+    logger.info(f"Training complete! Best loss: {best_loss[0]}")
+    torch.save(dec.state_dict(), path)
+    logger.info(f"Saved weights to '{path}'")

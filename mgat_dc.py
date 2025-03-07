@@ -17,7 +17,6 @@ parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of ge
 parser.add_argument("-t", "--train", action="store_true")
 parser.add_argument("-d", "--dec")
 
-
 if __name__ == "__main__":
     args = parser.parse_args()
     config = config.Config(path=args.config)
@@ -54,6 +53,7 @@ if __name__ == "__main__":
         conv_ae = models.Conv1DAutoencoder(n_layers=[256, 64, 32, 16, 8], latent_dim=2, input_shape=loader.input_shape)
         conv_ae.load_state_dict(torch.load(model_path, weights_only=True))
 
+        str_time = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        path = os.path.join(root, f"dec_{str_time}.pt")
         dec = models.DEC(ae=conv_ae, n_clusters=10, latent_dims=2)
-
-        trainer.train_dec(epochs=1000, dec=dec, batch_loader=batch_loader, logger=logger)
+        trainer.train_dec(epochs=1000, dec=dec, batch_loader=batch_loader, logger=logger, path=path)
