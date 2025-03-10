@@ -57,3 +57,4 @@ if __name__ == "__main__":
         path = os.path.join(root, f"dec_{str_time}.pt")
         dec = models.DEC(ae=conv_ae, n_clusters=10, latent_dims=2)
         trainer.train_dec(epochs=1000, dec=dec, batch_loader=batch_loader, logger=logger, path=path)
+

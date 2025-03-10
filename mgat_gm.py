@@ -78,11 +78,11 @@ if __name__ == "__main__":
     loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
     loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
-    # create metric learner (gaussian mixture model)
-    gmm_model = models.GMMLearner(loader=loader, n_clusters=args.n_clusters)
+    # create metric learner
+    gmm_model = models.MetricLeaner(loader=loader, n_clusters=args.n_clusters, cluster_type="gmm")
     gmm_model.create_latent()
     latent_space, y_pred, y_true = gmm_model.get_latent(), gmm_model.get_y_pred(), gmm_model.get_y_true()
-    covar = gmm_model.gaussian_model.covariances_[0]
+    covar = gmm_model.cluster_model.covariances_[0]
     inv_covar = np.linalg.inv(covar)
 
     # correlation

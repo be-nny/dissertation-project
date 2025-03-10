@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import logging
 
-from torch import nn, optim
+from torch import nn
 from tqdm import tqdm
 from model import models, utils
 

@@ -1,24 +1,34 @@
 import umap.umap_ as umap
 import numpy as np
 import torch
+from sklearn.cluster import KMeans
 
 from torch import nn
 from sklearn.mixture import GaussianMixture
+from model import utils
 
 LATENT_DIMS = 2
 SEED = 42
 
-class GMMLearner:
-    def __init__(self, loader, n_clusters):
-        self.n_clusters = n_clusters
-        self.loader = loader
+def _get_cluster_type(cluster_type: str, n_clusters: int):
+    if cluster_type == 'kmeans':
+        return KMeans(random_state=SEED, n_clusters=n_clusters)
+    elif cluster_type == 'gmm':
+        return GaussianMixture(n_components=n_clusters, random_state=SEED, covariance_type='full')
 
-        self.umap_model = umap.UMAP(n_components=LATENT_DIMS, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
-        self.gaussian_model = GaussianMixture(n_components=self.n_clusters, random_state=SEED, covariance_type='full')
+class MetricLeaner:
+    def __init__(self, loader: utils.Loader, n_clusters: int, cluster_type: str):
+        self.loader = loader
+        self.n_clusters = n_clusters
+
+        self.cluster_model = _get_cluster_type(cluster_type, n_clusters)
+        self.dim_reducer = umap.UMAP(n_components=LATENT_DIMS, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
 
         self.y_true = None
         self.y_pred = None
         self.latent_data = None
+
+        self.data_points = None
 
     def create_latent(self):
         """
@@ -27,8 +37,8 @@ class GMMLearner:
         """
 
         tmp, self.y_true = self.loader.all()
-        self.latent_data = self.umap_model.fit_transform(tmp).astype(np.float64)
-        self.y_pred = self.gaussian_model.fit_predict(self.latent_data)
+        self.latent_data = self.dim_reducer.fit_transform(tmp).astype(np.float64)
+        self.y_pred = self.cluster_model.fit_predict(self.latent_data)
 
         # delete this data to free up memory
         del tmp
@@ -43,8 +53,8 @@ class GMMLearner:
         :return: latent space, predicted labels
         """
 
-        latent = self.umap_model.fit_transform(new_data).astype(np.float64)
-        pred = self.gaussian_model.predict(latent)
+        latent = self.dim_reducer.fit_transform(new_data).astype(np.float64)
+        pred = self.cluster_model.predict(latent)
 
         return latent, pred
 

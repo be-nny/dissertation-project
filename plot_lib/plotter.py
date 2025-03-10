@@ -342,3 +342,11 @@ def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> No
     ax.set_xticks(x + width, classifier_labels)
     ax.legend()
     plt.show()
+
+def plot_loss(title, path, loss_values):
+    plt.plot(range(len(loss_values)), loss_values, label="Training Loss")
+    plt.title(title)
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig(path, bbox_inches='tight')
