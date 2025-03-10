@@ -293,7 +293,7 @@ def plot_inertia(latent_space, path, title, max_clusters=20, n_genres=10) -> Non
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
-def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path, max_n_neighbours: int = 100) -> None:
+def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path: str, title: str,max_n_neighbours: int = 100) -> None:
     accuracy_scores = []
 
     tqdm_loop = tqdm(range(1, max_n_neighbours + 1), desc="Computing correlation scores", unit="iter")
@@ -306,6 +306,7 @@ def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, cova
 
     plt.xlabel("Number of Neighbours")
     plt.ylabel("Accuracy")
+    plt.title(title)
     plt.legend()
     plt.savefig(path, bbox_inches='tight')
     plt.close()

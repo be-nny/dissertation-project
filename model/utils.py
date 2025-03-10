@@ -8,7 +8,8 @@ from tqdm import tqdm
 import torch
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
-from scipy.spatial.distance import mahalanobis
+from scipy.spatial.distance import mahalanobis, euclidean
+
 
 class ReceiptReader:
     def __init__(self, filename):
@@ -239,22 +240,27 @@ class CustomPoint:
         self.y_true = y_true
         self.raw_path = raw_path
 
-def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, covar: np.ndarray, raw_paths: list[str] = None, y_true: np.ndarray = None) -> list:
+def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, covar: np.ndarray | None, raw_paths: list[str] = None, y_true: np.ndarray = None) -> list:
     """
-    Uses mahalanobis distance to find the nearest neighbours to a point on the latent space.
+    Uses Mahalanobis or Euclidean distance to find the nearest neighbours to a point on the latent space. If no covariance matrix is provided, the
+    Euclidean distance will be used.
 
     :param y_true: true labels
     :param latent_space: the latent space
     :param raw_paths: the raw .mp3/.wav paths of the original audio
     :param point: a 'CustomPoint' point
     :param n_neighbours: the number of nearest neighbours
-    :param covar: covariance matrix
+    :param covar: covariance matrix. If set to None, euclidean distance metric will be used
     :return: a list of n nearest neighbours (ascending order)
     """
 
     nearest_neighbours = []
     for i, latent_point in enumerate(latent_space):
-        dist = mahalanobis(point, latent_point, covar)
+        if covar is None:
+            dist = euclidean(latent_point, point)
+        else:
+            dist = mahalanobis(point, latent_point, covar)
+
         if raw_paths is not None:
             path = os.path.basename(raw_paths[i])
             info = (dist, latent_point, path)
@@ -269,15 +275,16 @@ def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, 
 
     return sorted_nearest_neighbours
 
-def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred: np.ndarray, y_true: np.ndarray, covar: np.ndarray, n_neighbours: int = 5) -> list[CustomPoint]:
+def create_custom_points(latent_space: np.ndarray, raw_paths: list[str], y_pred: np.ndarray, y_true: np.ndarray, covar: np.ndarray | None, n_neighbours: int = 5) -> list[CustomPoint]:
     """
-    Creates a list of 'CustomPoints' to store additional infor about the data points before plotting them.
+    Creates a list of 'CustomPoints' to store additional infor about the data points before plotting them. If no covariance matrix is provided, the
+    Euclidean distance will be used.
 
     :param latent_space: the latent space
     :param raw_paths: the raw .mp3/.wav paths of the original audio
     :param y_pred: predicted labels
     :param y_true: true labels
-    :param covar: a list of covariance matrices
+    :param covar: covariance matrix. If set to None, Euclidean distance metric will be used
     :param n_neighbours: the number of nearest neighbours
     :return: a list of 'CustomPoints'
     """
@@ -328,10 +335,11 @@ def cluster_statistics(y_true: np.ndarray, y_pred: np.ndarray, loader: Loader) -
 def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray, n_neighbours: int = 5):
     """
     Works out the number of 'n' nearest neighbours for every point. Each neighbour is compared to the true label of each point.
+    If no covariance matrix is provided, the Euclidean distance will be used.
 
     :param latent_space: latent space
     :param y_true: true labels
-    :param covar: inverse covariance matrix
+    :param covar: covariance matrix. If set to None, Euclidean distance metric will be used
     :param n_neighbours: the number of nearest neighbours
     :return: true values, nearest neighbours predicted
     """
@@ -360,10 +368,10 @@ def correlation_metrics(y_true, y_pred):
 def connected_graph(latent_space: np.ndarray, covar: np.ndarray, n_neighbours: int = 5) -> dict:
     """
     Creates an undirected weighted graph, given a nearest neighbour value, of every point and what its distance is from
-    its nearest points is.
+    its nearest points is. If no covariance matrix is provided, the Euclidean distance will be used.
 
     :param latent_space: the latent space
-    :param covar: inverse covariance matrix
+    :param covar: covariance matrix. If set to None, Euclidean distance metric will be used
     :param n_neighbours: nearest neighbours
     :return: graph
     """
