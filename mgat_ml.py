@@ -125,11 +125,11 @@ if __name__ == "__main__":
     # getting covariance matrix (if required)
     inv_covar = None
     if args.type == "gmm":
-        logger.info(f"'{args.type}' - set distance metric to 'mahalanobis'")
+        logger.info(f"Using '{args.type}' - set distance metric to 'mahalanobis'")
         covar = metric_leaner.cluster_model.covariances_[0]
         inv_covar = np.linalg.inv(covar)
     else:
-        logger.info(f"'{args.type}' - set distance metric to 'euclidean'")
+        logger.info(f"Using '{args.type}' - set distance metric to 'euclidean'")
 
     # get cluster stats for tree maps
     cluster_stats = utils.cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)

@@ -240,7 +240,7 @@ class CustomPoint:
         self.y_true = y_true
         self.raw_path = raw_path
 
-def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, covar: np.ndarray | None, raw_paths: list[str] = None, y_true: np.ndarray = None) -> list:
+def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, covar: np.ndarray = None, raw_paths: list[str] = None, y_true: np.ndarray = None) -> list:
     """
     Uses Mahalanobis or Euclidean distance to find the nearest neighbours to a point on the latent space. If no covariance matrix is provided, the
     Euclidean distance will be used.
@@ -250,7 +250,7 @@ def find_nearest_neighbours(latent_space: np.ndarray, point, n_neighbours: int, 
     :param raw_paths: the raw .mp3/.wav paths of the original audio
     :param point: a 'CustomPoint' point
     :param n_neighbours: the number of nearest neighbours
-    :param covar: covariance matrix. If set to None, euclidean distance metric will be used
+    :param covar: covariance matrix. If set to None, Euclidean distance metric will be used
     :return: a list of n nearest neighbours (ascending order)
     """
 
