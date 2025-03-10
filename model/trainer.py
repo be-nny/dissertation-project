@@ -37,7 +37,7 @@ class RunningStats:
         std = torch.sqrt(self.var + 1e-8)
         return self.mean, std
 
-def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str) -> None:
+def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger) -> tuple[models.Conv1DAutoencoder, list]:
     """
     Trains a convolutional autoencoder, ready for the DEC model.
 
@@ -46,7 +46,8 @@ def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_
     :param batch_loader: batch loader
     :param batch_size: batch size
     :param logger: logger
-    :param path: path to save model
+
+    :return: trained conv autoencoder instances and the loss values
     """
 
     if torch.cuda.is_available():
@@ -93,11 +94,10 @@ def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_
         tqdm_loop.set_description(f"Training Convolutional Autoencoder - Loss={mean_loss}")
 
     logger.info(f"Training complete! Best loss: {best_loss[0]}")
-    torch.save(autoencoder.state_dict(), path)
-    logger.info(f"Saved weights to '{path}'")
 
+    return autoencoder, loss_vals
 
-def train_dec(epochs: int, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger, path: str) -> None:
+def train_dec(epochs: int, dec: models.DEC, batch_loader: utils.DataLoader, logger: logging.Logger, path: str) -> list:
     """
     Trains a Deep Embedded Clustering implementation using a pre-trained convolutional autoencoder. The loss function
     is a combination of the reconstruction loss of the convolutional autoencoder, and the KL divergence. These values
@@ -108,6 +108,8 @@ def train_dec(epochs: int, dec: models.DEC, batch_loader: utils.DataLoader, logg
     :param batch_loader: batch loader
     :param logger: logger
     :param path: path to save model
+
+    :return: loss values
     """
 
     if torch.cuda.is_available():
@@ -170,3 +172,5 @@ def train_dec(epochs: int, dec: models.DEC, batch_loader: utils.DataLoader, logg
     logger.info(f"Training complete! Best loss: {best_loss[0]}")
     torch.save(dec.state_dict(), path)
     logger.info(f"Saved weights to '{path}'")
+
+    return loss_vals
