@@ -37,7 +37,7 @@ class RunningStats:
         std = torch.sqrt(self.var + 1e-8)
         return self.mean, std
 
-def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger) -> tuple[models.Conv1DAutoencoder, list]:
+def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_loader: utils.DataLoader, batch_size: int, logger: logging.Logger, path: str) -> tuple[models.Conv1DAutoencoder, list]:
     """
     Trains a convolutional autoencoder, ready for the DEC model.
 
@@ -94,6 +94,8 @@ def train_autoencoder(epochs: int, autoencoder: models.Conv1DAutoencoder, batch_
         tqdm_loop.set_description(f"Training Convolutional Autoencoder - Loss={mean_loss}")
 
     logger.info(f"Training complete! Best loss: {best_loss[0]}")
+    torch.save(autoencoder.state_dict(), path)
+    logger.info(f"Saved weights to '{path}'")
 
     return autoencoder, loss_vals
 
@@ -174,3 +176,4 @@ def train_dec(epochs: int, dec: models.DEC, batch_loader: utils.DataLoader, logg
     logger.info(f"Saved weights to '{path}'")
 
     return loss_vals
+
