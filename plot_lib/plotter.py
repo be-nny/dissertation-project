@@ -195,123 +195,26 @@ def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,
     plt.title(title)
     plt.savefig(path, bbox_inches='tight')
 
-def draw_ellipse(position, covariance, ax=None, **kwargs) -> None:
-    """
-    Draw an ellipse with a given position and covariance
-
-    :param position: position of the ellipse
-    :param covariance: covariance of the ellipse
-    :param ax: ax to draw the ellipse on
-    :param kwargs: keyword arguments
-    """
-
-    ax = ax or plt.gca()
-
-    # convert covariance to principal axes
-    if covariance.shape == (2, 2):
-        U, s, Vt = np.linalg.svd(covariance)
-        angle = np.degrees(np.arctan2(U[1, 0], U[0, 0]))
-        width, height = 2 * np.sqrt(s)
-    else:
-        angle = 0
-        width, height = 2 * np.sqrt(covariance)
-
-    # draw the Ellipse
-    for nsig in range(1, 4):
-        ax.add_patch(Ellipse(position, nsig * width, nsig * height, angle=angle, **kwargs))
-
-def plot_gmm(gmm, X, labels, path, logger, title, ax=None) -> None:
-    """
-    Plot Gaussian Mixture Model with ellipses around points.
-
-    :param new_label: the labels for the new song segments in 'new_data'
-    :param new_data: plots a song highlighted in a different colour
-    :param title: title
-    :param gmm: gaussian mixture model
-    :param X: data
-    :param labels: true labels
-    :param path: path to save
-    :param logger: logger
-    :param ax: ax to draw figure on
-    """
-    colours = [CMAP(i / (gmm.n_components - 1)) for i in range(gmm.n_components)]
-    cmap = ListedColormap(colours)
-
-    ax = ax or plt.gca()
-    scatter = ax.scatter(X[:, 0], X[:, 1], c=labels, s=5, cmap=cmap, zorder=2)
-    ax.axis('equal')
-
-    w_factor = 0.2 / gmm.weights_.max()
-    for pos, covar, w in zip(gmm.means_, gmm.covariances_, gmm.weights_):
-        draw_ellipse(pos, covar, alpha=w * w_factor)
-
-    colorbar = plt.colorbar(scatter, ax=ax, ticks=np.arange(gmm.n_components))
-    colorbar.set_label('Cluster Labels', rotation=270, labelpad=15)
-    colorbar.set_ticks(np.arange(gmm.n_components))
-    colorbar.set_ticklabels([f"Cluster {i}" for i in range(gmm.n_components)])
-
-    plt.title(title)
-    ax.set_xlabel("Axis 1")
-    ax.set_ylabel("Axis 2")
-    plt.savefig(path, bbox_inches='tight')
-    logger.info(f"Saved plot '{path}'")
-
-def plot_inertia(latent_space, path, title, max_clusters=20, n_genres=10) -> None:
-    """
-    Plot inertia graph for kmeans.
-
-    :param title: title
-    :param latent_space: latent space data
-    :param logger: logger
-    :param path: path to save
-    :param max_clusters: maximum number of clusters
-    :param n_genres: the number of genres in the latent space
-    """
-
-    inertia = []
-    k_values = range(1, max_clusters + 1)
-    for k in k_values:
-        kmeans = KMeans(n_clusters=k)
-        kmeans.fit(latent_space)
-        inertia.append(kmeans.inertia_)
-
-    kneed_locator = KneeLocator(k_values, inertia, curve="convex", direction="decreasing")
-    elbow_k = kneed_locator.knee
-    elbow_inertia = inertia[elbow_k - 1]
-
-    plt.figure(figsize=(8, 6))
-    plt.axvline(x=elbow_k, color="red", linestyle="--", label=f"Elbow: k={elbow_k}")
-    plt.axhline(y=elbow_inertia, color="green", linestyle="--", label=f"Inertia: {elbow_inertia:.2e}")
-    plt.plot(k_values, inertia, color="blue", marker="o", linestyle="-")
-    plt.plot(n_genres, inertia[n_genres-1], color="red", marker="o", label=f"Total Genres: {n_genres}")
-
-    plt.xticks(k_values)
-    plt.xlabel("Number of Clusters")
-    plt.ylabel("Inertia Score")
-    plt.title(title)
-    plt.legend()
-    plt.savefig(path, bbox_inches='tight')
-    plt.close()
-
-def plot_correlation_accuracy(latent_space: np.ndarray, y_true: np.ndarray, covariance_mat, path: str, title: str,max_n_neighbours: int = 100) -> None:
+def plot_correlation_accuracy(latent_space, y_true, covariance_mat, label, max_n_neighbours: int = 100):
     accuracy_scores = []
-
-    tqdm_loop = tqdm(range(1, max_n_neighbours + 1), desc="Computing correlation scores", unit="iter")
-    for n in tqdm_loop:
+    for n in range(1, max_n_neighbours + 1):
         t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=covariance_mat, n_neighbours=n)
         acc = accuracy_score(t_corr, p_corr)
         accuracy_scores.append(acc)
 
-    plt.plot(range(1, max_n_neighbours + 1), accuracy_scores, label="Accuracy")
-
+    plt.plot(range(1, max_n_neighbours + 1), accuracy_scores, label=label)
     plt.xlabel("Number of Neighbours")
     plt.ylabel("Accuracy")
-    plt.title(title)
     plt.legend()
-    plt.savefig(path, bbox_inches='tight')
-    plt.close()
 
-def plot_correlation(cf_matrix, class_labels, n_neighbours, path, **kwargs) -> None:
+def plot_shannon_entropy(n_clusters, avg_shannon_vals, label: str) -> None:
+    plt.plot(n_clusters, avg_shannon_vals, label=label, alpha=0.7)
+    plt.xticks(ticks=n_clusters, labels=[str(int(x)) for x in n_clusters])
+    plt.xlabel("Number of Clusters")
+    plt.ylabel("Average Shannon Entropy")
+    plt.legend()
+
+def plot_correlation_conf_mat(cf_matrix, class_labels, n_neighbours, path, **kwargs) -> None:
     f1 = kwargs["f1_score"]
     precision = kwargs["precision"]
     recall = kwargs["recall"]
@@ -330,24 +233,18 @@ def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> No
     width = 0.1
     multiplier = 0
 
-    fig, ax = plt.subplots(layout="constrained")
+    fig, ax = plt.subplots()
 
     for signal_processor, accuracy_scores in data.items():
         offset = width * multiplier
         rects = ax.bar(x + offset, accuracy_scores, width, label=signal_processor)
-        ax.bar_label(rects, padding=3, fmt="%.0f")
+        ax.bar_label(rects, padding=3, fmt="%.2f")
         multiplier += 1
 
+    ax.set_title("Comparison of the Accuracy Between a set of Multi-classifiers and Different Preprocessed Datasets")
     ax.set_ylabel("Accuracy Scores")
     ax.set_title("Classifier Accuracy Scores per Signal Processor")
     ax.set_xticks(x + width, classifier_labels)
     ax.legend()
-    plt.show()
-
-def plot_loss(title, path, loss_values):
-    plt.plot(range(len(loss_values)), loss_values, label="Training Loss")
-    plt.title(title)
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.legend()
     plt.savefig(path, bbox_inches='tight')
+    plt.close()

@@ -2,6 +2,8 @@ import umap.umap_ as umap
 import numpy as np
 import torch
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 from torch import nn
 from sklearn.mixture import GaussianMixture
@@ -16,13 +18,23 @@ def _get_cluster_type(cluster_type: str, n_clusters: int):
     elif cluster_type == 'gmm':
         return GaussianMixture(n_components=n_clusters, random_state=SEED, covariance_type='full')
 
+def get_dim_model(model_type):
+    if model_type.lower() == "pca":
+        return PCA(n_components=2, random_state=SEED)
+    elif model_type == "umap":
+        return umap.UMAP(n_components=2, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
+    elif model_type == "tsne":
+        return TSNE(n_components=2, random_state=SEED)
+    else:
+        raise TypeError("Model type must be 'pca' or 'umap' or 'tsne'")
+
 class MetricLeaner:
     def __init__(self, loader: utils.Loader, n_clusters: int, cluster_type: str):
         self.loader = loader
         self.n_clusters = n_clusters
 
         self.cluster_model = _get_cluster_type(cluster_type, n_clusters)
-        self.dim_reducer = umap.UMAP(n_components=LATENT_DIMS, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
+        self.dim_reducer = get_dim_model("umap")
 
         self.y_true = None
         self.y_pred = None

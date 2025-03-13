@@ -50,10 +50,11 @@ def _normalise(signal_data: np.array) -> np.array:
 
 
 class Loader:
-    def __init__(self, uuid: str, out: str, logger, batch_size: int = 512):
+    def __init__(self, uuid: str, out: str, logger, batch_size: int = 512, verbose: bool = True):
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
         self.logger = logger
+        self.verbose = verbose
         self.input_shape = None
         self.dataloader = None
         self.split_type = None
@@ -72,8 +73,10 @@ class Loader:
         with ReceiptReader(filename=os.path.join(self.root, 'receipt.json')) as receipt:
             self.genres = receipt.genres
             self.signal_processor = receipt.signal_processor
+            self.segment_duration = receipt.seg_dur
 
-        self.logger.info(f"'{self.uuid}' applied with {self.signal_processor}")
+        if self.verbose:
+            self.logger.info(f"'{self.uuid}' applied with {self.signal_processor}")
 
     def _make_splits(self, split_type: str) -> list:
         """
@@ -110,8 +113,9 @@ class Loader:
         :return: tensorflow data loader
         """
         self.split_type = split_type
-        self.logger.info(f"'normalise' flag set to '{normalise}'")
-        self.logger.info(f"'flatten' flag set to '{flatten}'")
+        if self.verbose:
+            self.logger.info(f"'normalise' flag set to '{normalise}'")
+            self.logger.info(f"'flatten' flag set to '{flatten}'")
 
         if split_type == "all":
             d1, l1 = self._get_data_split(split_type="test", normalise=normalise, genre_filter=genre_filter)
@@ -187,11 +191,18 @@ class Loader:
         genre_labels = []
 
         if genre_filter != []:
-            self.logger.info(f"Loading files with genres:  {', '.join(genre_filter)}")
+            if self.verbose:
+                self.logger.info(f"Loading files with genres:  {', '.join(genre_filter)}")
         else:
-            self.logger.info(f"No Genre filters specified. Loading all genres")
+            if self.verbose:
+                self.logger.info(f"No Genre filters specified. Loading all genres")
 
-        for i in tqdm(range(0, len(split)), unit="file", desc=f"Loading {split_type} data from '{self.uuid}'"):
+        if self.verbose:
+            tqdm_loop = tqdm(range(0, len(split)), unit="file", desc=f"Loading {split_type} data from '{self.uuid}'")
+        else:
+            tqdm_loop = range(0, len(split))
+
+        for i in tqdm_loop:
             with (h5py.File(split[i], "r") as hdf_file):
                 b_genre = hdf_file["genre"][()]
                 genre = b_genre.decode("utf-8")

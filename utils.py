@@ -29,12 +29,12 @@ def show_info(logger: logging.Logger, config: config.Config) -> None:
     """
 
     datasets = os.listdir(config.OUTPUT_PATH)
-    exclude = ["experiments", "gaussian_model", "dec", "analysis"]
     for uuid in datasets:
-        if uuid[0] != "." and uuid not in exclude:
+        if uuid[0] != "." and "_" not in uuid:
             path = os.path.join(config.OUTPUT_PATH, uuid)
             receipt_file = os.path.join(path, "receipt.json")
             with model_utils.ReceiptReader(filename=receipt_file) as receipt_reader:
                 out_str = f"{uuid} - {receipt_reader.signal_processor:<15} SAMPLE SIZE: {receipt_reader.total_samples:<5} SEGMENT DURATION:{receipt_reader.seg_dur:<5} CREATED:{receipt_reader.created_time:<10}"
 
             logger.info(out_str)
+
