@@ -11,7 +11,6 @@ import model
 
 from tqdm import tqdm
 
-from plot_lib.plotter import plot_avg_std
 from utils import *
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
@@ -21,11 +20,10 @@ from preprocessor import preprocessor as p, signal_processor as sp
 
 matplotlib.use('TkAgg')
 
-parser = argparse.ArgumentParser(prog='Music Analysis Tool (MAT) - MODEL', formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool - METRIC LEARNER', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use, or a list of comma seperated uuid's (if --benchmark is being used)")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-r", "--run", action="store_true", help="Runs the model")
 parser.add_argument("-t", "--type", choices=["kmeans", "gmm"], help="Model type to use (kmeans, gmm)")
 parser.add_argument("-f", "--fit_new_song", help="Fit a new song")
 parser.add_argument("-p", "--path", action="store_true", help="Plots the shortest path between two random starting points")
@@ -109,100 +107,99 @@ if __name__ == "__main__":
     if args.info:
         show_info(logger, config)
     elif not args.type:
-        raise argparse.ArgumentError("Missing -t, --type flag. 'type' must be either 'kmeans' or 'gmm'")
+        parser.error("missing flags. '-t,--type' must be set")
 
     # runs the specified model (either 'kmeans' or 'gmm')
     # saves any relevant figures and displays the window
-    if args.run:
-        with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
-            signal_processor = receipt.signal_processor
-            segment_duration = receipt.seg_dur
+    with utils.ReceiptReader(filename=os.path.join(config.OUTPUT_PATH, f'{args.uuid}/receipt.json')) as receipt:
+        signal_processor = receipt.signal_processor
+        segment_duration = receipt.seg_dur
 
-        folder = f"{signal_processor}_{args.uuid}_{args.genres}_{args.n_clusters}"
-        root = f"{config.OUTPUT_PATH}/_{args.type}/{folder}"
-        if not os.path.exists(root):
-            os.makedirs(root)
+    folder = f"{signal_processor}_{args.uuid}_{args.genres}_{args.n_clusters}"
+    root = f"{config.OUTPUT_PATH}/_{args.type}/{folder}"
+    if not os.path.exists(root):
+        os.makedirs(root)
 
-        # create a dataloader
-        _, genre_filter = get_genre_filter(args.genres)
-        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
-        loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
+    # create a dataloader
+    _, genre_filter = get_genre_filter(args.genres)
+    loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=model.BATCH_SIZE)
+    loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
-        # create metric learner
-        metric_leaner = models.MetricLeaner(loader=loader, n_clusters=args.n_clusters, cluster_type=args.type)
-        metric_leaner.create_latent()
-        latent_space, y_pred, y_true = metric_leaner.get_latent(), metric_leaner.get_y_pred(), metric_leaner.get_y_true()
+    # create metric learner
+    metric_leaner = models.MetricLeaner(loader=loader, n_clusters=args.n_clusters, cluster_type=args.type)
+    metric_leaner.create_latent()
+    latent_space, y_pred, y_true = metric_leaner.get_latent(), metric_leaner.get_y_pred(), metric_leaner.get_y_true()
 
-        # getting covariance matrix (if required)
-        inv_covar = None
-        if args.type == "gmm":
-            logger.info(f"Using '{args.type}' - set distance metric to 'mahalanobis'")
-            covar = metric_leaner.cluster_model.covariances_[0]
-            inv_covar = np.linalg.inv(covar)
-        else:
-            logger.info(f"Using '{args.type}' - set distance metric to 'euclidean'")
+    # getting covariance matrix (if required)
+    inv_covar = None
+    if args.type == "gmm":
+        logger.info(f"Using '{args.type}' - set distance metric to 'mahalanobis'")
+        covar = metric_leaner.cluster_model.covariances_[0]
+        inv_covar = np.linalg.inv(covar)
+    else:
+        logger.info(f"Using '{args.type}' - set distance metric to 'euclidean'")
 
-        # get cluster stats for tree maps
-        cluster_stats = utils.cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
+    # get cluster stats for tree maps
+    cluster_stats = utils.cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
 
-        # create a set of data points that can be used for interactive plot
-        data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=inv_covar)
+    # create a set of data points that can be used for interactive plot
+    data_points = utils.create_custom_points(latent_space=latent_space, y_pred=y_pred, y_true=y_true, raw_paths=loader.get_associated_paths(), covar=inv_covar)
 
-        # create graph for shortest path
-        graph = utils.connected_graph(latent_space, inv_covar)
-        start_point = latent_space[np.random.randint(len(latent_space))]
-        end_point = latent_space[np.random.randint(len(latent_space))]
+    # create graph for shortest path
+    graph = utils.connected_graph(latent_space, inv_covar)
+    start_point = latent_space[np.random.randint(len(latent_space))]
+    end_point = latent_space[np.random.randint(len(latent_space))]
 
-        s = ','.join(str(p) for p in start_point)
-        e = ','.join(str(p) for p in end_point)
-        _, shortest_path = utils.shortest_path(graph, s, e)
+    s = ','.join(str(p) for p in start_point)
+    e = ','.join(str(p) for p in end_point)
+    _, shortest_path = utils.shortest_path(graph, s, e)
 
-        # plotting the shortest path between two random points
-        if not len(shortest_path):
-            logger.warning("No shortest path could be found. Try adjusting nearset neighbours for `utils.connected_graph`")
+    # plotting the shortest path between two random points
+    if not len(shortest_path):
+        logger.warning("No shortest path could be found. Try adjusting nearset neighbours for `utils.connected_graph`")
 
-        # correlation
-        n_neighbours_total = [1, 5, 10, 50]
-        tqdm_loop = tqdm(n_neighbours_total, desc="Computing correlation matrices", unit="iter")
-        for n_neighbours in tqdm_loop:
-            t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
-            f1, precision, recall, acc = utils.correlation_metrics(t_corr, p_corr)
+    # correlation
+    n_neighbours_total = [1, 5, 10, 50]
+    tqdm_loop = tqdm(n_neighbours_total, desc="Computing correlation matrices", unit="iter")
+    for n_neighbours in tqdm_loop:
+        t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=inv_covar, n_neighbours=n_neighbours)
+        f1, precision, recall, acc = utils.correlation_metrics(t_corr, p_corr)
 
-            cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
-            class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
-            path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat.pdf"
-            plotter.plot_correlation_conf_mat(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path, f1_score=f1, recall=recall, precision=precision, accuracy=acc)
+        cf_matrix = confusion_matrix(loader.decode_label(t_corr), loader.decode_label(p_corr))
+        class_labels = sorted(set(loader.decode_label(t_corr)) | set(loader.decode_label(p_corr)))
+        path = f"{root}/{n_neighbours}_nearest_neighbours_confusion_mat.pdf"
+        plotter.plot_correlation_conf_mat(cf_matrix=cf_matrix, class_labels=class_labels, n_neighbours=n_neighbours, path=path, f1_score=f1, recall=recall, precision=precision, accuracy=acc)
 
-        # plot tree maps
-        path = f"{root}/tree_map.pdf"
-        plotter.plot_tree_map(cluster_stats=cluster_stats, path=path)
+    # plot tree maps
+    path = f"{root}/tree_map.pdf"
+    plotter.plot_tree_map(cluster_stats=cluster_stats, path=path)
+    logger.info(f"Saved plot '{path}'")
+
+    # show window
+    path = f"{root}/{args.type}_plot.pdf"
+    title = f"{str(args.type).upper()} cluster boundaries with {signal_processor} applied"
+    if args.type == "gmm":
+        ax, fig = interactive_plotter.interactive_gmm(gmm=metric_leaner.cluster_model, data_points=data_points, title=title, path=path)
+        logger.info(f"Saved plot '{path}'")
+    elif args.type == "kmeans":
+        ax, fig = interactive_plotter.interactive_kmeans(kmeans=metric_leaner.cluster_model, data_points=data_points, title=title, path=path)
         logger.info(f"Saved plot '{path}'")
 
-        # show window
-        path = f"{root}/{args.type}_plot.pdf"
-        title = f"{str(args.type).upper()} cluster boundaries with {signal_processor} applied"
-        if args.type == "gmm":
-            ax, fig = interactive_plotter.interactive_gmm(gmm=metric_leaner.cluster_model, data_points=data_points, title=title, path=path)
-            logger.info(f"Saved plot '{path}'")
-        elif args.type == "kmeans":
-            ax, fig = interactive_plotter.interactive_kmeans(kmeans=metric_leaner.cluster_model, data_points=data_points, title=title, path=path)
-            logger.info(f"Saved plot '{path}'")
+    # show the shortest path
+    if args.path and len(shortest_path) > 1:
+        path = f"{root}/{args.type}_plot_shortest_path.pdf"
+        _add_shortest_path(shortest_path=shortest_path, data_points=data_points, start_point=start_point, end_point=end_point, ax=ax, path=path)
+        logger.info(f"Saved plot '{path}'")
 
-        # show the shortest path
-        if args.path and len(shortest_path) > 1:
-            path = f"{root}/{args.type}_plot_shortest_path.pdf"
-            _add_shortest_path(shortest_path=shortest_path, data_points=data_points, start_point=start_point, end_point=end_point, ax=ax, path=path)
-            logger.info(f"Saved plot '{path}'")
+    # fit new song to plot the 'song evolution'
+    if args.fit_new_song:
+        file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
+        path = f"{root}/gaussian_plot_with_{file_name}.pdf"
+        _fit_new(new_file_path=args.fit_new_song, model=metric_leaner, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
+        logger.info(f"Saved plot '{path}'")
 
-        # fit new song to plot the 'song evolution'
-        if args.fit_new_song:
-            file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
-            path = f"{root}/gaussian_plot_with_{file_name}.pdf"
-            _fit_new(new_file_path=args.fit_new_song, model=metric_leaner, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
-            logger.info(f"Saved plot '{path}'")
+    logger.info("Displaying Window")
 
-        logger.info("Displaying Window")
-
-        prom_genres = "Most Common Genre per Cluster: " + ', '.join([f"{k}: {v}" for k, v in _prominent_genres(cluster_stats).items()])
-        logger.info(prom_genres)
-        plt.show()
+    prom_genres = "Most Common Genre per Cluster: " + ', '.join([f"{k}: {v}" for k, v in _prominent_genres(cluster_stats).items()])
+    logger.info(prom_genres)
+    plt.show()
