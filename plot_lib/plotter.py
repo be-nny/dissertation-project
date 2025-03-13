@@ -233,7 +233,7 @@ def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> No
     width = 0.1
     multiplier = 0
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(20, 6))
 
     for signal_processor, accuracy_scores in data.items():
         offset = width * multiplier

@@ -40,7 +40,7 @@ parser.add_argument("-cr", "--correlation", action="store_true", help="plots the
 parser.add_argument("-sh", "--shannon", action="store_true", help="plots the average shannon entropy values against as the number of clusters is increased")
 parser.add_argument("-ei", "--eigen", type=int, help="plots the eigenvalues obtained after performing PCA. takes value for max n_components")
 parser.add_argument("-vi", "--visualise", help="plots 2D latent space after applying a dimensionality reduction technique", choices=["umap", "pca", "tsne"])
-parser.add_argument("-cl", "--classifier", help="plots the accuracy ")
+parser.add_argument("-cl", "--classifier", help="plots the comparison of the accuracy between a set of multi-classifiers and different preprocessed datasets", choices=["umap", "pca", "tsne"])
 
 BATCH_SIZE = 512
 
@@ -91,155 +91,169 @@ if __name__ == "__main__":
     if args.info:
         show_info(logger, config)
 
-    if args.uuid:
-        if args.eigen:
-            save_dir = _make_save_dir("eigenvalue-plots")
+    if args.eigen:
+        if args.uuid is None:
+            parser.error("missing flags. '-u,--uuid' must be set")
 
-            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            pca_model = PCA(n_components=args.eigen)
+        save_dir = _make_save_dir("eigenvalue-plots")
 
-            batch_loader = loader.load(split_type="all", normalise=True)
-            data, y_true = loader.all()
-            pca_model.fit(data)
-            path = os.path.join(save_dir, f"{args.uuid}_{loader.signal_processor}_eigenvalues.pdf")
+        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+        pca_model = PCA(n_components=args.eigen)
 
-            title = f"PCA Eigenvalues (log scale) with {loader.signal_processor} applied \n Total features: {pca_model.n_features_in_}"
-            plot_eigenvalues(path=path, pca_model=pca_model, title=title)
-            logger.info(f"Saved plot '{path}'")
+        batch_loader = loader.load(split_type="all", normalise=True)
+        data, y_true = loader.all()
+        pca_model.fit(data)
+        path = os.path.join(save_dir, f"{args.uuid}_{loader.signal_processor}_eigenvalues.pdf")
 
-        if args.visualise:
-            save_dir = _make_save_dir("latent-plots")
+        title = f"PCA Eigenvalues (log scale) with {loader.signal_processor} applied \n Total features: {pca_model.n_features_in_}"
+        plot_eigenvalues(path=path, pca_model=pca_model, title=title)
+        logger.info(f"Saved plot '{path}'")
 
+    if args.visualise:
+        if args.uuid is None or args.genres is None:
+            parser.error("missing flags. '-u,--uuid', '-g,--genres' must be set.")
+
+        save_dir = _make_save_dir("latent-plots")
+
+        _, genre_filter = get_genre_filter(args.genres)
+        loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
+        loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+
+        data, y_true = loader.all()
+        dim_model = models.get_dim_model(args.visualise)
+        latent = dim_model.fit_transform(data)
+
+        path = os.path.join(save_dir, f"{args.uuid}_{loader.signal_processor}_{args.visualise.lower()}_{args.genres}_visualisation_2D.pdf")
+        title = f"Latent Space in 2D with {loader.signal_processor} applied using {args.visualise.lower()}"
+        plot_2D(latent_space=latent, y_true=y_true, path=path, genre_filter=args.genres, loader=loader, title=title)
+        logger.info(f"Saved plot '{path}'")
+
+    if args.correlation:
+        if args.uuid is None or args.cluster_type is None:
+            parser.error("missing flags. '-u,--uuid', '-t,--cluster_type' must be set.")
+
+        save_dir = _make_save_dir("correlation")
+
+        uuids = args.uuid.split(",")
+        logger.info("Loading datasets...")
+        datasets = _load_uuids(uuids, args.cluster_type)
+        dataset_items = tqdm(datasets.items(), desc="Correlation accuracy...", unit="dataset")
+        for uuid, data in dataset_items:
+            latent_space, y_pred, y_true, inv_covar, sp, sd = data["latent_space"], data["y_pred"], data["y_true"], data["inv_covar"], data["signal_processor"], data["segment_duration"]
+            plot_correlation_accuracy(latent_space=latent_space, y_true=y_true, covariance_mat=inv_covar, label=f"{sp}_{sd}")
+
+        plt.title(f"Correlation Accuracy Comparison for {args.type}")
+        correlation_accuracy_plot_path = os.path.join(save_dir, f"correlation_accuracy_{args.uuid}_{args.cluster_type}.pdf")
+        plt.savefig(correlation_accuracy_plot_path, bbox_inches='tight')
+        plt.close()
+        logger.info(f"Saved plot '{correlation_accuracy_plot_path}'")
+
+    if args.shannon:
+        if args.uuid is None or args.cluster_type is None:
+            parser.error("missing flags. '-u,--uuid', '-t,--cluster_type' must be set.")
+
+        save_dir = _make_save_dir("shannon-entropy")
+        max_clusters = 20
+        uuids = args.uuid.split(",")
+        logger.info("Loading datasets...")
+        datasets = _load_uuids(uuids, args.cluster_type)
+        dataset_items = tqdm(datasets.items(), desc="Calculating Shannon Entropy Averages...", unit="dataset")
+        for uuid, data in dataset_items:
+            y_true, loader, cluster_model, latent_space, sp, sd = data["y_true"], data["loader"], data["cluster_model"], data["latent_space"], data["signal_processor"], data["segment_duration"]
+
+            entropy_values = []
+            for i in range(2, max_clusters + 1):
+                if args.cluster_type == "gmm":
+                    cluster_model.n_components = i
+                else:
+                    cluster_model.n_clusters = i
+
+                y_pred = cluster_model.predict(latent_space)
+
+                # work out the shannon entropy for each cluster
+                c_shan_entropy = 0
+                cluster_stats = utils.cluster_statistics(y_true, y_pred, loader)
+                for cluster_key, values in cluster_stats.items():
+                    labels = []
+                    sizes = []
+                    for key, value in values.items():
+                        labels.append(key)
+                        sizes.append(cluster_stats[cluster_key][key])
+
+                    sizes = np.array(sizes)
+                    probs = [s/sizes.sum() for s in sizes]
+                    entropy = -np.sum(probs * np.log(probs))
+                    c_shan_entropy += entropy
+
+                # average these entropy values
+                avg_c_shan_entropy = c_shan_entropy/i
+                entropy_values.append(avg_c_shan_entropy)
+
+            plot_shannon_entropy(n_clusters=[n for n in range(2, max_clusters + 1)], avg_shannon_vals=entropy_values, label=f"{sp}_{sd}")
+
+        plt.title(f"Average Shannon Entropy Comparison for {args.cluster_type}")
+        entropy_path = os.path.join(save_dir, f"entropy_averages_{args.uuid}_{args.cluster_type}.pdf")
+        plt.savefig(entropy_path, bbox_inches='tight')
+        plt.close()
+        logger.info(f"Saved plot '{entropy_path}'")
+
+    if args.classifier:
+        if args.uuid is None or args.genres is None:
+            parser.error("missing flags. '-u,--uuid', '-g,--genres' must be set.")
+
+        save_dir = _make_save_dir("classifier")
+
+        names = [
+            "Nearest Neighbors",
+            "Linear SVM",
+            "RBF SVM",
+            "Gaussian Process",
+            "Decision Tree",
+            "Random Forest",
+            "Neural Net",
+            "AdaBoost",
+            "Naive Bayes",
+            "QDA",
+        ]
+
+        classifiers = [
+            KNeighborsClassifier(3),
+            SVC(kernel="linear", C=0.025, random_state=42),
+            SVC(gamma=2, C=1, random_state=42),
+            GaussianProcessClassifier(1.0 * RBF(1.0), random_state=42),
+            DecisionTreeClassifier(random_state=42),
+            RandomForestClassifier(random_state=42),
+            MLPClassifier(alpha=1, max_iter=1000, random_state=42),
+            AdaBoostClassifier(random_state=42),
+            GaussianNB(),
+            QuadraticDiscriminantAnalysis(),
+        ]
+
+        datasets = args.uuid.split(",")
+        bar_plot_scores = {}
+        for dataset in datasets:
             _, genre_filter = get_genre_filter(args.genres)
-            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=args.uuid, logger=logger, batch_size=BATCH_SIZE)
-            loader.load(split_type="all", normalise=True, genre_filter=genre_filter)
+            loader = utils.Loader(out=config.OUTPUT_PATH, uuid=dataset, logger=logger, batch_size=BATCH_SIZE)
+            dim_model = models.get_dim_model(args.classifier)
 
-            data, y_true = loader.all()
-            dim_model = models.get_dim_model(args.visualise)
-            latent = dim_model.fit_transform(data)
+            # training
+            loader.load(split_type="train", normalise=True, genre_filter=genre_filter, flatten=True)
+            train_data, y_train = loader.all()
+            x_train = dim_model.fit_transform(train_data)
 
-            path = os.path.join(save_dir, f"{args.uuid}_{loader.signal_processor}_{args.visualise.lower()}_{args.genres}_visualisation_2D.pdf")
-            title = f"Latent Space in 2D with {loader.signal_processor} applied using {args.visualise.lower()}"
-            plot_2D(latent_space=latent, y_true=y_true, path=path, genre_filter=args.genres, loader=loader, title=title)
-            logger.info(f"Saved plot '{path}'")
+            # testing
+            loader.load(split_type="test", normalise=True, genre_filter=genre_filter, flatten=True)
+            test_data, y_test = loader.all()
+            x_test = dim_model.fit_transform(test_data)
 
-        if args.correlation:
-            save_dir = _make_save_dir("correlation")
+            scores = []
+            for name, classifier in zip(names, classifiers):
+                classifier.fit(x_train, y_train)
+                y_pred = classifier.predict(x_test)
+                acc = accuracy_score(y_test, y_pred)
+                scores.append(acc)
 
-            uuids = args.uuid.split(",")
-            logger.info("Loading datasets...")
-            datasets = _load_uuids(uuids, args.cluster_type)
-            dataset_items = tqdm(datasets.items(), desc="Correlation accuracy...", unit="dataset")
-            for uuid, data in dataset_items:
-                latent_space, y_pred, y_true, inv_covar, sp, sd = data["latent_space"], data["y_pred"], data["y_true"], data["inv_covar"], data["signal_processor"], data["segment_duration"]
-                plot_correlation_accuracy(latent_space=latent_space, y_true=y_true, covariance_mat=inv_covar, label=f"{sp}_{sd}")
+            bar_plot_scores.update({f"{loader.signal_processor}_{loader.segment_duration}": scores})
 
-            plt.title(f"Correlation Accuracy Comparison for {args.type}")
-            correlation_accuracy_plot_path = os.path.join(save_dir, f"correlation_accuracy_{args.uuid}_{args.cluster_type}.pdf")
-            plt.savefig(correlation_accuracy_plot_path, bbox_inches='tight')
-            plt.close()
-            logger.info(f"Saved plot '{correlation_accuracy_plot_path}'")
-
-        if args.shannon:
-            save_dir = _make_save_dir("shannon-entropy")
-            max_clusters = 20
-            uuids = args.uuid.split(",")
-            logger.info("Loading datasets...")
-            datasets = _load_uuids(uuids, args.cluster_type)
-            dataset_items = tqdm(datasets.items(), desc="Calculating Shannon Entropy Averages...", unit="dataset")
-            for uuid, data in dataset_items:
-                y_true, loader, cluster_model, latent_space, sp, sd = data["y_true"], data["loader"], data["cluster_model"], data["latent_space"], data["signal_processor"], data["segment_duration"]
-
-                entropy_values = []
-                for i in range(2, max_clusters + 1):
-                    if args.cluster_type == "gmm":
-                        cluster_model.n_components = i
-                    else:
-                        cluster_model.n_clusters = i
-
-                    y_pred = cluster_model.predict(latent_space)
-
-                    # work out the shannon entropy for each cluster
-                    c_shan_entropy = 0
-                    cluster_stats = utils.cluster_statistics(y_true, y_pred, loader)
-                    for cluster_key, values in cluster_stats.items():
-                        labels = []
-                        sizes = []
-                        for key, value in values.items():
-                            labels.append(key)
-                            sizes.append(cluster_stats[cluster_key][key])
-
-                        sizes = np.array(sizes)
-                        probs = [s/sizes.sum() for s in sizes]
-                        entropy = -np.sum(probs * np.log(probs))
-                        c_shan_entropy += entropy
-
-                    # average these entropy values
-                    avg_c_shan_entropy = c_shan_entropy/i
-                    entropy_values.append(avg_c_shan_entropy)
-
-                plot_shannon_entropy(n_clusters=[n for n in range(2, max_clusters + 1)], avg_shannon_vals=entropy_values, label=f"{sp}_{sd}")
-
-            plt.title(f"Average Shannon Entropy Comparison for {args.cluster_type}")
-            entropy_path = os.path.join(save_dir, f"entropy_averages_{args.uuid}_{args.cluster_type}.pdf")
-            plt.savefig(entropy_path, bbox_inches='tight')
-            plt.close()
-            logger.info(f"Saved plot '{entropy_path}'")
-
-        if args.classifier:
-            save_dir = _make_save_dir("classifier")
-
-            names = [
-                "Nearest Neighbors",
-                "Linear SVM",
-                "RBF SVM",
-                "Gaussian Process",
-                "Decision Tree",
-                "Random Forest",
-                "Neural Net",
-                "AdaBoost",
-                "Naive Bayes",
-                "QDA",
-            ]
-
-            classifiers = [
-                KNeighborsClassifier(3),
-                SVC(kernel="linear", C=0.025, random_state=42),
-                SVC(gamma=2, C=1, random_state=42),
-                GaussianProcessClassifier(1.0 * RBF(1.0), random_state=42),
-                DecisionTreeClassifier(random_state=42),
-                RandomForestClassifier(random_state=42),
-                MLPClassifier(alpha=1, max_iter=1000, random_state=42),
-                AdaBoostClassifier(random_state=42),
-                GaussianNB(),
-                QuadraticDiscriminantAnalysis(),
-            ]
-
-            datasets = args.uuid.split(",")
-            bar_plot_scores = {}
-            for dataset in datasets:
-                _, genre_filter = get_genre_filter(args.genres)
-                loader = utils.Loader(out=config.OUTPUT_PATH, uuid=dataset, logger=logger, batch_size=BATCH_SIZE)
-                dim_model = models.get_dim_model(args.classifier)
-
-                # training
-                loader.load(split_type="train", normalise=True, genre_filter=genre_filter, flatten=True)
-                train_data, y_train = loader.all()
-                x_train = dim_model.fit_transform(train_data)
-
-                # testing
-                loader.load(split_type="test", normalise=True, genre_filter=genre_filter, flatten=True)
-                test_data, y_test = loader.all()
-                x_test = dim_model.fit_transform(test_data)
-
-                scores = []
-                for name, classifier in zip(names, classifiers):
-                    classifier.fit(x_train, y_train)
-                    y_pred = classifier.predict(x_test)
-                    acc = accuracy_score(y_test, y_pred)
-                    scores.append(acc)
-
-                bar_plot_scores.update({f"{loader.signal_processor}_{loader.segment_duration}": scores})
-
-            classifier_path = os.path.join(save_dir, f"classifier_accuracy_{args.uuid}")
-            plot_classifier_scores(bar_plot_scores, names, classifier_path)
+        classifier_path = os.path.join(save_dir, f"classifier_accuracy_{args.uuid}")
+        plot_classifier_scores(bar_plot_scores, names, classifier_path)
