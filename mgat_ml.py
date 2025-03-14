@@ -1,16 +1,11 @@
 import argparse
-import json
 import os.path
-
 import matplotlib
 import numpy as np
-from kneed import KneeLocator
-
 import logger
 import model
 
 from tqdm import tqdm
-
 from utils import *
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix

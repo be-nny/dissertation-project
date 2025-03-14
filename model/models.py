@@ -1,9 +1,11 @@
 import umap.umap_ as umap
 import numpy as np
+import cvxpy as cp
 import torch
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.metrics import euclidean_distances
 
 from torch import nn
 from sklearn.mixture import GaussianMixture
@@ -20,11 +22,11 @@ def _get_cluster_type(cluster_type: str, n_clusters: int):
 
 def get_dim_model(model_type):
     if model_type.lower() == "pca":
-        return PCA(n_components=2, random_state=SEED)
+        return PCA(n_components=LATENT_DIMS, random_state=SEED)
     elif model_type == "umap":
-        return umap.UMAP(n_components=2, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
+        return umap.UMAP(n_components=LATENT_DIMS, n_neighbors=10, spread=3, min_dist=0.3, repulsion_strength=2, learning_rate=1.5, n_epochs=500, random_state=SEED)
     elif model_type == "tsne":
-        return TSNE(n_components=2, random_state=SEED)
+        return TSNE(n_components=LATENT_DIMS, random_state=SEED)
     else:
         raise TypeError("Model type must be 'pca' or 'umap' or 'tsne'")
 
@@ -87,6 +89,58 @@ class MetricLeaner:
         :return: the true labels
         """
         return self.y_true
+
+
+class ConvexCluster:
+    def __init__(self, loader: utils.Loader):
+        self.loader = loader
+        self.dim_reducer = get_dim_model("umap")
+
+        self._create_latent()
+    def _create_latent(self):
+        tmp, self.y_true = self.loader.all()
+        self.latent_space = self.dim_reducer.fit_transform(tmp).astype(np.float64)
+        del tmp
+
+    def convex_cluster(self, lambda_vals, k):
+        """
+        Minimises a penalising loss function over a range of lambda values to show the evolution of the cluster centres.
+
+        :param lambda_vals: lambda vals
+        :param k: k nearest neighbours
+        :return:
+        """
+        clustering_path = []
+        n, m = self.latent_space.shape
+        dists = euclidean_distances(self.latent_space)
+        np.fill_diagonal(dists, np.inf)
+
+        # initialise the weights
+        weights = np.zeros((n, n))
+        for i in range(n):
+            nearest = np.argsort(dists[i])[:k]
+            weights[i, nearest] = np.exp(-dists[i, nearest] ** 2)
+
+        for lambda_val in lambda_vals:
+            cluster_centre = cp.Variable((n, m))
+
+            # the loss function
+            loss_func = 0.5 * cp.sum_squares(self.latent_space - cluster_centre)
+
+            # the penalisation function
+            penalised_vals = []
+            for i in range(n):
+                for j in range(i + 1, n):
+                    penalised_vals.append(weights[i, j] * cp.norm(cluster_centre[i] - cluster_centre[j], 2))
+            penalty_func = lambda_val * cp.sum(penalised_vals)
+
+            # minimise this loss function
+            minimise_pen_loss_func = cp.Problem(cp.Minimize(loss_func + penalty_func))
+            minimise_pen_loss_func.solve()
+            clustering_path.append(cluster_centre.value)
+
+        return clustering_path
+
 
 def target_distribution(assignments):
     """

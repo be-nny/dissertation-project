@@ -228,6 +228,32 @@ def plot_correlation_conf_mat(cf_matrix, class_labels, n_neighbours, path, **kwa
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
+def plot_conex_clusters(latent_space, u_path, loader, y_true):
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111)
+
+    # plot cluster center paths
+    for i in range(len(latent_space)):
+        path = np.array([U[i] for U in u_path])
+        ax.plot(path[:, 0], path[:, 1], color="black", alpha=0.5)
+        ax.scatter(path[:, 0], path[:, 1], color="black", s=10, alpha=0.5)
+
+    # create colour bar labels
+    unique_labels = np.unique(y_true)
+    str_labels = loader.decode_label(unique_labels)
+    colours = [CMAP(i / (len(unique_labels) - 1)) for i in range(len(unique_labels))]
+    cmap = ListedColormap(colours)
+
+    scatter = ax.scatter(latent_space[:, 0], latent_space[:, 1], c=y_true, cmap=cmap, s=20)
+    colour_bar = plt.colorbar(scatter, ax=ax, label="Cluster Labels")
+    colour_bar.set_ticks(unique_labels)
+    colour_bar.set_ticklabels(str_labels)
+
+    ax.set_title("Convex Clustering")
+    ax.set_xlabel("Axis 1")
+    ax.set_ylabel("Axis 2")
+    plt.show()
+
 def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> None:
     x = np.arange(len(classifier_labels))
     width = 0.1
