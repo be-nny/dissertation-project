@@ -2,13 +2,16 @@ import umap.umap_ as umap
 import numpy as np
 import cvxpy as cp
 import torch
+from numba.scripts.generate_lower_listing import description
+
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.metrics import euclidean_distances
-
 from torch import nn
 from sklearn.mixture import GaussianMixture
+from tqdm import tqdm
+
 from model import utils
 
 LATENT_DIMS = 2
