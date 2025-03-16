@@ -15,9 +15,9 @@ from preprocessor import preprocessor as p, signal_processor as sp
 
 matplotlib.use('TkAgg')
 
-parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool - METRIC LEARNER', formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool - CLUSTER', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
-parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use, or a list of comma seperated uuid's (if --benchmark is being used)")
+parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use, or a list of comma seperated uuid's")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
 parser.add_argument("-t", "--type", choices=["kmeans", "gmm"], help="Model type to use (kmeans, gmm)")
 parser.add_argument("-f", "--fit_new_song", help="Fit a new song")
@@ -122,7 +122,6 @@ if __name__ == "__main__":
 
     # create metric learner
     metric_leaner = models.MetricLeaner(loader=loader, n_clusters=args.n_clusters, cluster_type=args.type)
-    metric_leaner.create_latent()
     latent_space, y_pred, y_true = metric_leaner.get_latent(), metric_leaner.get_y_pred(), metric_leaner.get_y_true()
 
     # getting covariance matrix (if required)

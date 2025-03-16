@@ -2,7 +2,6 @@ import umap.umap_ as umap
 import numpy as np
 import cvxpy as cp
 import torch
-from numba.scripts.generate_lower_listing import description
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -11,7 +10,6 @@ from sklearn.metrics import euclidean_distances
 from torch import nn
 from sklearn.mixture import GaussianMixture
 from tqdm import tqdm
-
 from model import utils
 
 LATENT_DIMS = 2
@@ -47,7 +45,9 @@ class MetricLeaner:
 
         self.data_points = None
 
-    def create_latent(self):
+        self._create_latent()
+
+    def _create_latent(self):
         """
         Creates a latent representation by transforming the data using UMAP, and then applying a Gaussian Mixture Model
         to the data to cluster the latent points.
@@ -59,8 +59,6 @@ class MetricLeaner:
 
         # delete this data to free up memory
         del tmp
-
-        return self
 
     def fit_new(self, new_data):
         """
@@ -100,6 +98,7 @@ class ConvexCluster:
         self.dim_reducer = get_dim_model("umap")
 
         self._create_latent()
+
     def _create_latent(self):
         tmp, self.y_true = self.loader.all()
         self.latent_space = self.dim_reducer.fit_transform(tmp).astype(np.float64)
@@ -118,24 +117,26 @@ class ConvexCluster:
         dists = euclidean_distances(self.latent_space)
         np.fill_diagonal(dists, np.inf)
 
-        # initialise the weights
+        # initialise the weights by finding the k nearest neighbours to each point
         weights = np.zeros((n, n))
         for i in range(n):
             nearest = np.argsort(dists[i])[:k]
             weights[i, nearest] = np.exp(-dists[i, nearest] ** 2)
 
-        for lambda_val in lambda_vals:
+        tqdm_loop = tqdm(lambda_vals, desc="Clustering...")
+        for lambda_val in tqdm_loop:
             cluster_centre = cp.Variable((n, m))
 
             # the loss function
             loss_func = 0.5 * cp.sum_squares(self.latent_space - cluster_centre)
 
             # the penalisation function
-            penalised_vals = []
-            for i in range(n):
-                for j in range(i + 1, n):
-                    penalised_vals.append(weights[i, j] * cp.norm(cluster_centre[i] - cluster_centre[j], 2))
-            penalty_func = lambda_val * cp.sum(penalised_vals)
+            # these calculations have been vectorised for performance opt.
+            diff = cp.reshape(cluster_centre, (n, 1, m), order="F") - cp.reshape(cluster_centre, (1, n, m), order="F")
+            diff_flat = cp.reshape(diff, (n * n, m), order="F")
+            norms_flat = cp.norm(diff_flat, 2, axis=1)
+            norms = cp.reshape(norms_flat, (n, n), order="F")
+            penalty_func = lambda_val * 0.5 * cp.sum(cp.multiply(weights, norms))
 
             # minimise this loss function
             minimise_pen_loss_func = cp.Problem(cp.Minimize(loss_func + penalty_func))

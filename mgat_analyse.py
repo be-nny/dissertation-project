@@ -59,7 +59,6 @@ def _load_uuids(dataset_uuids, cluster_type):
 
         # create metric learner
         metric_leaner = models.MetricLeaner(loader=loader, n_clusters=n_genres, cluster_type=cluster_type)
-        metric_leaner.create_latent()
         latent_space, y_pred, y_true = metric_leaner.get_latent(), metric_leaner.get_y_pred(), metric_leaner.get_y_true()
 
         inv_covar = None

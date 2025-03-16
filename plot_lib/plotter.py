@@ -228,7 +228,7 @@ def plot_correlation_conf_mat(cf_matrix, class_labels, n_neighbours, path, **kwa
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
-def plot_conex_clusters(latent_space, u_path, loader, y_true):
+def plot_conex_clusters(latent_space, u_path, loader, y_true, path):
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111)
 
@@ -252,6 +252,7 @@ def plot_conex_clusters(latent_space, u_path, loader, y_true):
     ax.set_title("Convex Clustering")
     ax.set_xlabel("Axis 1")
     ax.set_ylabel("Axis 2")
+    plt.savefig(path, bbox_inches='tight')
     plt.show()
 
 def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> None:
