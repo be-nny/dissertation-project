@@ -8,10 +8,11 @@ import model
 from tqdm import tqdm
 from utils import *
 from matplotlib import pyplot as plt
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, homogeneity_score, davies_bouldin_score, calinski_harabasz_score, silhouette_score
 from model import utils, models
 from plot_lib import plotter, interactive_plotter
 from preprocessor import preprocessor as p, signal_processor as sp
+from scipy.spatial.distance import mahalanobis
 
 matplotlib.use('TkAgg')
 
@@ -93,6 +94,24 @@ def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: s
     plt.savefig(path, bbox_inches='tight')
 
     return fig, ax
+
+
+def _mahalanobis_distance_matrix(X, VI):
+    """
+    Compute pairwise Mahalanobis distance matrix for dataset X given inverse covariance matrix VI.
+
+    :param X: latent space
+    :param VI: inverse covariance matrix
+    :return: distance matrix
+    """
+    n_samples = X.shape[0]
+    dist_matrix = np.zeros((n_samples, n_samples))
+
+    for i in range(n_samples):
+        for j in range(n_samples):
+            dist_matrix[i, j] = mahalanobis(X[i], X[j], VI)
+
+    return dist_matrix
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -196,4 +215,15 @@ if __name__ == "__main__":
 
     prom_genres = "Most Common Genre per Cluster: " + ', '.join([f"{k}: {v}" for k, v in _prominent_genres(cluster_stats).items()])
     logger.info(prom_genres)
+    logger.info(f"homogeneity score: {homogeneity_score(y_true, y_pred):.4f}")
+    logger.info(f"davies bouldin score: {davies_bouldin_score(latent_space, y_pred):.4f}")
+    logger.info(f"calinski harabasz score: {calinski_harabasz_score(latent_space, y_pred):.4f}")
+
+    if inv_covar is not None:
+        dist_matrix = _mahalanobis_distance_matrix(latent_space, inv_covar)
+        logger.info(f"silhouette score: {silhouette_score(dist_matrix, y_pred, metric='precomputed'):.4f}")
+    else:
+        logger.info(f"silhouette score: {silhouette_score(latent_space, y_pred):.4f}")
+
     plt.show()
+

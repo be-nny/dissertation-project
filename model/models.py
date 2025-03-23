@@ -98,6 +98,9 @@ class ConvexCluster:
         self.dim_reducer = get_dim_model("umap")
 
         self._create_latent()
+        self.centres = []
+        self.clustering_path = []
+        self.y_pred = None
 
     def _create_latent(self):
         tmp, self.y_true = self.loader.all()
@@ -112,7 +115,6 @@ class ConvexCluster:
         :param k: k nearest neighbours
         :return:
         """
-        clustering_path = []
         n, m = self.latent_space.shape
         dists = euclidean_distances(self.latent_space)
         np.fill_diagonal(dists, np.inf)
@@ -141,10 +143,25 @@ class ConvexCluster:
             # minimise this loss function
             minimise_pen_loss_func = cp.Problem(cp.Minimize(loss_func + penalty_func))
             minimise_pen_loss_func.solve()
-            clustering_path.append(cluster_centre.value)
 
-        return clustering_path
+            self.clustering_path.append(cluster_centre.value)
 
+        self.centres = np.array(self.clustering_path[-1])
+        self.y_pred = self._create_labels()
+
+        return self.clustering_path
+
+    def _create_labels(self, tol=1e-3):
+        n = self.centres.shape[0]
+        labels = -np.ones(n, dtype=np.int)
+        current_label = 0
+        for i in range(n):
+            if labels[i] == -1:
+                for j in range(i+1,n):
+                    if labels[j] == -1 and np.linalg.norm(self.centres[i] - self.centres[j]) < tol:
+                        labels[j] = current_label
+                current_label +=1
+        return labels
 
 def target_distribution(assignments):
     """
