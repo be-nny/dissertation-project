@@ -1,11 +1,6 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 
-from scipy.cluster.hierarchy import dendrogram
 from sklearn.metrics import accuracy_score
-from tqdm import tqdm
-
 from model import utils
 from plot_lib import *
 
@@ -236,7 +231,7 @@ def plot_convex_clusters(latent_space, u_path, loader, y_true, path):
     for i in range(len(latent_space)):
         cluster_path = np.array([U[i] for U in u_path])
         ax.plot(cluster_path[:, 0], cluster_path[:, 1], color="black", alpha=0.3)
-        ax.scatter(cluster_path[:, 0], cluster_path[:, 1], color="black", s=5, alpha=0.3)
+        ax.scatter(cluster_path[:, 0], cluster_path[:, 1], color="black", s=3, alpha=0.3)
 
     # create colour bar labels
     unique_labels = np.unique(y_true)

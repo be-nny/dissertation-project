@@ -151,7 +151,7 @@ class ConvexCluster:
 
     def _create_labels(self, tol=1e-3):
         n = self.centres.shape[0]
-        labels = -np.ones(n, dtype=np.int)
+        labels = -np.ones(n, dtype=np.int64)
         current_label = 0
         for i in range(n):
             if labels[i] == -1:
