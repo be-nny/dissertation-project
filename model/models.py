@@ -1,13 +1,11 @@
 import umap.umap_ as umap
 import numpy as np
 import cvxpy as cp
-import torch
 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.metrics import euclidean_distances
-from torch import nn
 from sklearn.mixture import GaussianMixture
 from tqdm import tqdm
 from model import utils
@@ -162,100 +160,3 @@ class ConvexCluster:
                         labels[j] = current_label
                 current_label +=1
         return labels
-
-def target_distribution(assignments):
-    """
-    This sharpens the predicted probabilities to focuses more confident assignments
-    :param assignments: soft assignments
-    :return: target distribution (num_samples, num_clusters)
-    """
-
-    targets = assignments.pow(2) / (assignments.sum(dim=0, keepdim=True) + 1e-6)
-    targets = targets / targets.sum(dim=1, keepdim=True)
-    return targets
-
-class DEC(nn.Module):
-    def __init__(self, n_clusters, latent_dims, ae):
-        super().__init__()
-
-        self.n_clusters = n_clusters
-        self.latent_dims = latent_dims
-        self.ae = ae
-        self.alpha = 1
-
-        # create a clustering layer of size (n_clusters, latent_dims)
-        # initialise it with a normal distribution
-        self.clustering_layer = nn.Parameter(torch.Tensor(n_clusters, latent_dims))
-        nn.init.xavier_uniform_(self.clustering_layer.data)
-
-    def forward(self, x):
-        latent_space, reconstructed = self.ae(x)
-
-        q = self._t_distribution(latent_space)
-
-        return q, latent_space, reconstructed
-
-    def _t_distribution(self, latent_space):
-        """
-        Use Student's t-Distribution to create a vector of probabilities of this point being assigned to a particular
-        cluster. This vector is then normalised.
-        :param latent_space: latent_space
-        :return: soft assignments (num_samples, num_clusters)
-        """
-
-        q = 1.0 / (1.0 + torch.sum(torch.pow(latent_space.unsqueeze(1) - self.clustering_layer, 2), 2) / self.alpha)
-        q = q.pow((self.alpha + 1.0) / 2.0)
-        q = (q.t() / torch.sum(q, 1)).t()
-        return q
-
-class Conv1DAutoencoder(nn.Module):
-    def __init__(self, n_layers: list, input_shape, latent_dim=10):
-        super().__init__()
-        self.n_layers = n_layers
-        K_S = 3
-        S = 2
-        P = 1
-
-        # encoder
-        encoder_layers = []
-        self.current_length = input_shape[1]
-        for i in range(0, len(n_layers) - 1):
-            # work out the size after conv and max pool is applied
-            self.current_length = (self.current_length + 2 * P - K_S) // S + 1
-            self.current_length = (self.current_length + 2 * P - K_S) // S + 1
-
-            encoder_layers.append(nn.Conv1d(n_layers[i], n_layers[i + 1], kernel_size=K_S, stride=S, padding=P))
-            encoder_layers.append(nn.LeakyReLU())
-            encoder_layers.append(nn.MaxPool1d(kernel_size=K_S, stride=S, padding=P))
-
-        # adding FCN
-        encoder_layers.append(nn.Flatten())
-        encoder_layers.append(nn.Linear(self.current_length*n_layers[-1], latent_dim))
-        encoder_layers.append(nn.LeakyReLU())
-
-        # decoder
-        reversed_layers = n_layers[::-1]
-        decoder_layers = [
-            nn.Linear(latent_dim, self.current_length*n_layers[-1]),
-            nn.LeakyReLU()
-        ]
-        self.linear_decoder = nn.Sequential(*decoder_layers)
-
-        decoder_layers = []
-        for i in range(0, len(reversed_layers) - 1):
-            decoder_layers.append(nn.ConvTranspose1d(reversed_layers[i], reversed_layers[i + 1], kernel_size=4, stride=4, padding=2, output_padding=3))
-            decoder_layers.append(nn.LeakyReLU())
-
-        self.encoder = nn.Sequential(*encoder_layers)
-        self.decoder = nn.Sequential(*decoder_layers)
-
-    def forward(self, x):
-        latent = self.encoder(x)
-
-        linear = self.linear_decoder(latent)
-        linear_reshaped = linear.view(linear.size(0), self.n_layers[-1], self.current_length)
-
-        decoded = self.decoder(linear_reshaped)
-
-        return latent, decoded
-
