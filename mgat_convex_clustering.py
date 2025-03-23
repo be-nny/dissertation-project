@@ -1,14 +1,12 @@
 import argparse
 import os.path
-
-from sklearn.metrics import homogeneity_score, davies_bouldin_score, calinski_harabasz_score
-
 import config
 import matplotlib
 import numpy as np
 import model
 import logger
 
+from sklearn.metrics import homogeneity_score, davies_bouldin_score, calinski_harabasz_score, silhouette_score
 from model import models, utils
 from plot_lib import plotter
 
@@ -44,3 +42,4 @@ if __name__ == "__main__":
     logger.info(f"homogeneity score: {homogeneity_score(convex_cluster_model.y_true, convex_cluster_model.y_pred):.4f}")
     logger.info(f"davies bouldin score: {davies_bouldin_score(convex_cluster_model.latent_space, convex_cluster_model.y_pred):.4f}")
     logger.info(f"calinski harabasz score: {calinski_harabasz_score(convex_cluster_model.latent_space, convex_cluster_model.y_pred):.4f}")
+    logger.info(f"silhouette score: {silhouette_score(convex_cluster_model, convex_cluster_model.y_pred):.4f}")
