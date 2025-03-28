@@ -1,4 +1,4 @@
-# Music Analysis with Machine Learning
+# Music Genre Analysis with Machine Learning
 
 ## The `config.yml` File
 This file contains any configuration settings for preprocessing and clustering.
@@ -46,7 +46,6 @@ python mgat_convex_clustering.py -c config.yml -u abcde -k 10 -l 15
 ```
 - `-k` $k$ nearest neighbours when $W$ weight matrix is created
 - `-l` $\lambda$ value
-
 
 ---
 ## References
