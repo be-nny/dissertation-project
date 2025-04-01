@@ -25,8 +25,8 @@ dataset/
 ├─ genre_n/
 ```
 
-## Preprocessing
-## Clustering
+# Preprocessing
+# Clustering
 This project implements K-Means and a Gaussian Mixture Model (GMM) to cluster a preprocessed dataset.
 
 ```pycon
@@ -36,7 +36,7 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 - `-n` the number of clusters
 - `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
 
-## Convex Clustering
+# Convex Clustering
 
 The following function is used to optimise the cluster centres and build a hierarchy path as inspired from [[2]](#2).
 $$f_{\lambda}(U)=\frac{1}{2} \sum_{i=1}^{n}||u_i-x_i||^{2}+\lambda \sum_{i < j}W_{i,j}||u_i-u_j||$$
@@ -47,8 +47,34 @@ python mgat_convex_clustering.py -c config.yml -u abcde -k 10 -l 15
 - `-k` $k$ nearest neighbours when $W$ weight matrix is created
 - `-l` $\lambda$ value
 
+# Latent Space Analysis
+## 1.) Shortest Path
+```pycon
+python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -p
+```
+- `-t` type of clustering model: `kmeans` or `gmm`
+- `-n` the number of clusters
+- `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
+- `-p` shortest path between two randomly initialised points
+
+![gmm_plot_shortest_path.png](examples/gmm_plot_shortest_path.png)
+
+## 2.) Song Recommendation
+```pycon
+python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -p
+```
+- `-t` type of clustering model: `kmeans` or `gmm`
+- `-n` the number of clusters
+- `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
+
+Click on a point in the latent space to see its nearest neighbours (defaulted to 5)
+
+![song_recommendation.png](examples/song_recommendation.png)
+
+## 3.) Song Genre Evolution
+
 ---
-## References
+# References
 <a id="2">[1]</a>  
 Olteanu, A. (n.d.).  
 GTZAN Dataset - Music Genre Classification.  
