@@ -61,7 +61,7 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -p
 
 ## 2.) Song Recommendation
 ```pycon
-python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -p
+python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 ```
 - `-t` type of clustering model: `kmeans` or `gmm`
 - `-n` the number of clusters
@@ -72,6 +72,14 @@ Click on a point in the latent space to see its nearest neighbours (defaulted to
 ![song_recommendation.png](examples/song_recommendation.png)
 
 ## 3.) Song Genre Evolution
+
+# Performance
+
+<div style="display: flex; align-items: center;">
+  <img src="examples/shannon_entropy.png" width="500">
+  <p style="margin-left: 10px;"></p>p>
+  <p style="margin-left: 10px;">There is a trade-off between not mixing too many genres (low Shannon entropy) and not fragmenting the dataset into too many granular and specialised genres. Although just past the elbow of the curve, the curve shows that 7 clusters, when using all 10 genres, prioritises genre fragmentation, whilst still yielding a low Shannon entropy.</p>
+</div>
 
 ---
 # References
