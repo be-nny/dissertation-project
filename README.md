@@ -3,7 +3,9 @@
 - This research proposes the use of **unsupervised machine learning** methods to partially get rid of the reliance for predetermined labels and instead let the clustering define the genres and like songs. 
 - Clustering the latent space allows for such applications like **song recommendation**, plotting the **song evolution**, and understanding the intricate **local structures of a sound space**.
 
-This project uses **UMAP** to reduce the dimensions of the transformed songs into 2 Dimensions
+This project uses **UMAP** to reduce the dimensions of the transformed songs into 2 Dimensions with a choice of three models: K-Means, a Gaussian Mixture Model (GMM), and a Convex Clustering algorithm, that can be applied to the latent space.
+Its noted that using a GMM better represents the latent space due to the soft assignments given to each point plus the covariance structure produces better song recommendations.
+The convex clustering algorithm creates a hierarchical structure of the song data points.
 
 ## ⚙️ The Config File ⚙️
 A `config.yml` contains any configuration settings for preprocessing and clustering.
