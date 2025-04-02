@@ -3,7 +3,7 @@
 - This research proposes the use of **unsupervised machine learning** methods to partially get rid of the reliance for predetermined labels and instead let the clustering define the genres and like songs. 
 - Clustering the latent space allows for such applications like **song recommendation**, plotting the **song evolution**, and understanding the intricate **local structures of a sound space**.
 
-This project uses **UMAP** to reduce the dimensions of the transformed songs into 2 Dimensions with a choice of three models: K-Means, a Gaussian Mixture Model (GMM), and a Convex Clustering algorithm, that can be applied to the latent space.
+This project uses **UMAP** [[1]](#1) to reduce the dimensions of the transformed songs into 2 Dimensions with a choice of three models: K-Means, a Gaussian Mixture Model (GMM), and a Convex Clustering algorithm, that can be applied to the latent space.
 Its noted that using a GMM better represents the latent space due to the soft assignments given to each point plus the covariance structure produces better song recommendations.
 The convex clustering algorithm creates a hierarchical structure of the song data points.
 
@@ -20,7 +20,7 @@ preprocessor_config:
 
 ## 🗄️ Dataset Directory 🗄️
 The input dataset should be structure in the following way. A root directory containing a list of subdirectories named as the genre name with a series of `mp3` or `wav` files in them.
-This project uses the `GTZAN` dataset [[1]](#1).
+This project uses the `GTZAN` dataset [[2]](#2).
 
 ```
 dataset/
@@ -68,7 +68,7 @@ python mgat_convex_clustering.py -c config.yml -u abcde -k 10 -l 15
 - `-k` $k$ nearest neighbours when $W$ weight matrix is created
 - `-l` $\lambda$ value
 
-The following function is used to optimise the cluster centres and build a hierarchy path as inspired from [[2]](#2).
+The following function is used to optimise the cluster centres and build a hierarchy path as inspired from [[3]](#3).
 
 $$
 f_{\lambda}(U)=\frac{1}{2} \sum_{i=1}^{n}||u_i-x_i||^{2}+\lambda \sum_{i < j}W_{i,j}||u_i-u_j||
@@ -109,12 +109,18 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -f
 
 ---
 # References
-<a id="2">[1]</a>  
+<a id="1">[1]</a>  
+McInnes, L., Healy, J., & Melville, J. (2018).  
+UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction.  
+*arXiv preprint arXiv:1802.03426*.  
+[https://arxiv.org/abs/1802.03426](https://arxiv.org/abs/1802.03426)
+
+<a id="2">[2]</a>  
 Olteanu, A. (n.d.).  
 GTZAN Dataset - Music Genre Classification.  
 Retrieved from [Kaggle](https://www.kaggle.com/datasets/andradaolteanu/gtzan-dataset-music-genre-classification).
 
-<a id="1">[2]</a>  
+<a id="3">[3]</a>  
 Chen, G., Chi, E., Ranola, J., & Lange, K. (2014).  
 Convex clustering: An attractive alternative to hierarchical clustering.  
 *PLoS Computational Biology, 11*, e1004228.  
