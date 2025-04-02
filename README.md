@@ -33,14 +33,18 @@ dataset/
 ```
 
 ## 🪄 Preprocessing 🪄
-Preprocess the dataset to set a target length and snippet length with a choice of: `MEL_SPEC`, `CQT`, `MFCC`, and `SPEC_CENTROID`
-
 ```pycon
 python mgat_preprocessor.py -c config.yml -s MEL_SPEC
 ```
 - `-s` type of signal transformer: `MEL_SPEC`, `CQT`, `MFCC`, and `SPEC_CENTROID`
 
+Preprocess the dataset to set a target length and snippet length with a choice of: `MEL_SPEC`, `CQT`, `MFCC`, and `SPEC_CENTROID`.
 This will create a unique directory in the output path specified in `config.yml` use this uuid when specifying the `-u` flag
+
+| <img src="examples/MEL_SPEC.png" width=1000/> | <img src="examples/CQT.png" width=1000/> | <img src="examples/MFCC.png" width=1000/> | <img src="examples/SPEC_CENTROID.png" width=1000/> |
+|------------------------------------------------------------------------------|------------------------------------------|-------------------------------------------|----------------------------------------------------|
+| `MEL_SPEC`                                                                   | `CQT`                                    | `MFCC`                                    | `SPEC_CENTROID`                                    |
+
 
 ## ✨ Clustering Methods ✨
 | <img src="examples/kmeans.png" width=1000/> | <img src="examples/gmm.png" width=1000/> | <img src="examples/convex_clustering.png" width=1000/>        |
