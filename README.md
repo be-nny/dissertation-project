@@ -42,9 +42,12 @@ python mgat_preprocessor.py -c config.yml -s MEL_SPEC
 
 This will create a unique directory in the output path specified in `config.yml` use this uuid when specifying the `-u` flag
 
-## ✨ Clustering ✨
-This project implements K-Means and a Gaussian Mixture Model (GMM) to cluster a preprocessed dataset.
+## ✨ Clustering Methods ✨
+| <img src="examples/kmeans.png" width=1000/> | <img src="examples/gmm.png" width=1000/> | <img src="examples/convex_clustering.png" width=1000/>        |
+|---------------------------------------------|------------------------------------------|---------------------------------------------------------------|
+| K-Means with $n=7$                          | GMM with $n=7$                           | Convex Clustering implementation with $k=25$ and $\lambda=15$ |
 
+### Clustering
 ```pycon
 python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 ```
@@ -52,21 +55,25 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 - `-n` the number of clusters
 - `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
 
-## ✨Convex Clustering ✨
+This project implements K-Means and a Gaussian Mixture Model (GMM) to cluster a preprocessed dataset.
 
-The following function is used to optimise the cluster centres and build a hierarchy path as inspired from [[2]](#2).
-$$f_{\lambda}(U)=\frac{1}{2} \sum_{i=1}^{n}||u_i-x_i||^{2}+\lambda \sum_{i < j}W_{i,j}||u_i-u_j||$$
-
+### Convex Clustering
 ```pycon
 python mgat_convex_clustering.py -c config.yml -u abcde -k 10 -l 15
 ```
 - `-k` $k$ nearest neighbours when $W$ weight matrix is created
 - `-l` $\lambda$ value
 
-## 🎶Latent Space Analysis 🎶
+The following function is used to optimise the cluster centres and build a hierarchy path as inspired from [[2]](#2).
+
+$$
+f_{\lambda}(U)=\frac{1}{2} \sum_{i=1}^{n}||u_i-x_i||^{2}+\lambda \sum_{i < j}W_{i,j}||u_i-u_j||
+$$
+
+## 🎶 Latent Space Analysis 🎶
 | <img src="examples/gmm_plot_shortest_path.png" width=1000/> | <img src="examples/song_recommendation.png" width=1000/> | <img src="examples/song_evolution.png" width=1000/> |
-|-------------------------------------------------------------|----------------------------------------------------------|-----------------------------------------------------|
-| _Shortest path using a gaussian mixture model_              | _Song recommendation using a gaussian mixture model_     | _Song evolution using a gaussian mixture model_     |
+|-----------------------------------------------------------|--------------------------------------------------------|---------------------------------------------------|
+| Shortest path using a gaussian mixture model              | Song recommendation using a gaussian mixture model     | Song evolution using a gaussian mixture model     |
 
 ### 1.) Shortest Path
 ```pycon
