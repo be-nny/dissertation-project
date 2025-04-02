@@ -207,7 +207,7 @@ if __name__ == "__main__":
     # fit new song to plot the 'song evolution'
     if args.fit_new_song:
         file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
-        path = f"{root}/gaussian_plot_with_{file_name}.pdf"
+        path = f"{root}/gmm_with_{file_name}.pdf"
         _fit_new(new_file_path=args.fit_new_song, model=metric_leaner, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax, path=path)
         logger.info(f"Saved plot '{path}'")
 
