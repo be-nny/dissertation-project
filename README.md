@@ -1,7 +1,12 @@
-# Music Genre Analysis with Machine Learning
+# 🚀 Music Genre Analysis with Machine Learning 🚀
+- Music genre analysis is typically treated as a multi-classification problem. With the influx in the number of modern day genres, multi-classification networks struggle to generalise to lots of classes and the subjective nature of what defines a genre may mean a song could belong into two or more genres.
+- This research proposes the use of **unsupervised machine learning** methods to partially get rid of the reliance for predetermined labels and instead let the clustering define the genres and like songs. 
+- Clustering the latent space allows for such applications like **song recommendation**, plotting the **song evolution**, and understanding the intricate **local structures of a sound space**.
 
-## The `config.yml` File
-This file contains any configuration settings for preprocessing and clustering.
+This project uses **UMAP** to reduce the dimensions of the transformed songs into 2 Dimensions
+
+## ⚙️ The Config File ⚙️
+A `config.yml` contains any configuration settings for preprocessing and clustering.
 ```yml
 dataset: "/path/to/dataset"
 output: "/output/directory"
@@ -11,7 +16,7 @@ preprocessor_config:
   train_split: float_val_between_0_1
 ```
 
-## Dataset Directory
+## 🗄️ Dataset Directory 🗄️
 The input dataset should be structure in the following way. A root directory containing a list of subdirectories named as the genre name with a series of `mp3` or `wav` files in them.
 This project uses the `GTZAN` dataset [[1]](#1).
 
@@ -25,8 +30,17 @@ dataset/
 ├─ genre_n/
 ```
 
-# Preprocessing
-# Clustering
+## 🪄 Preprocessing 🪄
+Preprocess the dataset to set a target length and snippet length with a choice of: `MEL_SPEC`, `CQT`, `MFCC`, and `SPEC_CENTROID`
+
+```pycon
+python mgat_preprocessor.py -c config.yml -s MEL_SPEC
+```
+- `-s` type of signal transformer: `MEL_SPEC`, `CQT`, `MFCC`, and `SPEC_CENTROID`
+
+This will create a unique directory in the output path specified in `config.yml` use this uuid when specifying the `-u` flag
+
+## ✨ Clustering ✨
 This project implements K-Means and a Gaussian Mixture Model (GMM) to cluster a preprocessed dataset.
 
 ```pycon
@@ -36,7 +50,7 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 - `-n` the number of clusters
 - `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
 
-# Convex Clustering
+## ✨Convex Clustering ✨
 
 The following function is used to optimise the cluster centres and build a hierarchy path as inspired from [[2]](#2).
 $$f_{\lambda}(U)=\frac{1}{2} \sum_{i=1}^{n}||u_i-x_i||^{2}+\lambda \sum_{i < j}W_{i,j}||u_i-u_j||$$
@@ -47,8 +61,12 @@ python mgat_convex_clustering.py -c config.yml -u abcde -k 10 -l 15
 - `-k` $k$ nearest neighbours when $W$ weight matrix is created
 - `-l` $\lambda$ value
 
-# Latent Space Analysis
-## 1.) Shortest Path
+## 🎶Latent Space Analysis 🎶
+| <img src="examples/gmm_plot_shortest_path.png" width=1000/> | <img src="examples/song_recommendation.png" width=1000/> | <img src="examples/song_evolution.png" width=1000/> |
+|-------------------------------------------------------------|----------------------------------------------------------|-----------------------------------------------------|
+| _Shortest path using a gaussian mixture model_              | _Song recommendation using a gaussian mixture model_     | _Song evolution using a gaussian mixture model_     |
+
+### 1.) Shortest Path
 ```pycon
 python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -p
 ```
@@ -57,9 +75,7 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -p
 - `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
 - `-p` shortest path between two randomly initialised points
 
-![gmm_plot_shortest_path.png](examples/gmm_plot_shortest_path.png)
-
-## 2.) Song Recommendation
+### 2.) Song Recommendation
 ```pycon
 python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 ```
@@ -67,19 +83,16 @@ python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all
 - `-n` the number of clusters
 - `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
 
-Click on a point in the latent space to see its nearest neighbours (defaulted to 5)
+**Click on a point in the latent space to see its nearest neighbours (defaulted to 5)**
 
-![song_recommendation.png](examples/song_recommendation.png)
-
-## 3.) Song Genre Evolution
-
-# Performance
-
-<div style="display: flex; align-items: center;">
-  <img src="examples/shannon_entropy.png" width="500">
-  <p style="margin-left: 10px;"></p>p>
-  <p style="margin-left: 10px;">There is a trade-off between not mixing too many genres (low Shannon entropy) and not fragmenting the dataset into too many granular and specialised genres. Although just past the elbow of the curve, the curve shows that 7 clusters, when using all 10 genres, prioritises genre fragmentation, whilst still yielding a low Shannon entropy.</p>
-</div>
+### 3.) Song Genre Evolution
+```pycon
+python mgat_clustering.py -c config.yml -u abcde -t [kmeans|gmm] -n 10 -g all -f path/to/song
+```
+- `-t` type of clustering model: `kmeans` or `gmm`
+- `-n` the number of clusters
+- `-g` which genres to cluster (`all` for all genres, or a comma seperated list of the genres)
+- `-f` path to mp3 file of new song to plot
 
 ---
 # References
