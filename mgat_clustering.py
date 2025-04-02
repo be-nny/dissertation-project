@@ -71,7 +71,7 @@ def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: s
 
     # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
-    overlap_ratio = 0.5
+    overlap_ratio = 1
     signal_func_width = segment_data.shape[-1]
 
     stride = int(signal_func_width * overlap_ratio)
@@ -83,8 +83,8 @@ def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: s
     overlapping_reg = np.lib.stride_tricks.as_strided(merged_signals, shape=out_shape, strides=strides)
 
     flattened_overlapping_reg = [arr.flatten() for arr in overlapping_reg]
-    new_fitted, _ = model._fit_new(flattened_overlapping_reg)
-
+    new_fitted, _ = model.fit_new(flattened_overlapping_reg)
+    print(len(new_fitted))
     ax.scatter(new_fitted[:, 0], new_fitted[:, 1], color="purple", s=10)
     ax.scatter(new_fitted[0][0], new_fitted[0][1], color="blue", marker="^", s=10, label="start")
     ax.scatter(new_fitted[-1][0], new_fitted[-1][1], color="red", marker="s", s=10, label="end")
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     if args.fit_new_song:
         file_name = os.path.basename(args.fit_new_song).strip().replace("_", " ")
         path = f"{root}/gaussian_plot_with_{file_name}.pdf"
-        _fit_new(new_file_path=args.fit_new_song, model=metric_leaner, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax)
+        _fit_new(new_file_path=args.fit_new_song, model=metric_leaner, signal_func_name=signal_processor, sample_rate=config.SAMPLE_RATE, segment_duration=segment_duration, fig=fig, ax=ax, path=path)
         logger.info(f"Saved plot '{path}'")
 
     logger.info("Displaying Window")
