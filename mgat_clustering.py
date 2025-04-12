@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool - CLUSTER', for
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use, or a list of comma seperated uuid's")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")
-parser.add_argument("-t", "--type", choices=["kmeans", "gmm"], help="Model type to use (kmeans, gmm)")
+parser.add_argument("-t", "--cluster_type", choices=["kmeans", "gmm"], help="Model type to use (kmeans, gmm)")
 parser.add_argument("-f", "--fit_new_song", help="Fit a new song")
 parser.add_argument("-p", "--path", action="store_true", help="Plots the shortest path between two random starting points")
 parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of genres to use (e.g., jazz,rock,blues,disco) - if set to 'all', all genres are used")
@@ -71,7 +71,7 @@ def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: s
 
     # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
-    overlap_ratio = 1
+    overlap_ratio = 0.3
     signal_func_width = segment_data.shape[-1]
 
     stride = int(signal_func_width * overlap_ratio)
@@ -84,7 +84,6 @@ def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: s
 
     flattened_overlapping_reg = [arr.flatten() for arr in overlapping_reg]
     new_fitted, _ = model.fit_new(flattened_overlapping_reg)
-    print(len(new_fitted))
     ax.scatter(new_fitted[:, 0], new_fitted[:, 1], color="purple", s=10)
     ax.scatter(new_fitted[0][0], new_fitted[0][1], color="blue", marker="^", s=10, label="start")
     ax.scatter(new_fitted[-1][0], new_fitted[-1][1], color="red", marker="s", s=10, label="end")
@@ -120,7 +119,7 @@ if __name__ == "__main__":
 
     if args.info:
         show_info(logger, config)
-    elif not args.type:
+    elif not args.cluster_type:
         parser.error("missing flags. '-t,--type' must be set")
 
     # runs the specified model (either 'kmeans' or 'gmm')
@@ -130,7 +129,7 @@ if __name__ == "__main__":
         segment_duration = receipt.seg_dur
 
     folder = f"{signal_processor}_{args.uuid}_{args.genres}_{args.n_clusters}"
-    root = f"{config.OUTPUT_PATH}/_{args.type}/{folder}"
+    root = f"{config.OUTPUT_PATH}/_{args.cluster_type}/{folder}"
     if not os.path.exists(root):
         os.makedirs(root)
 
@@ -140,17 +139,17 @@ if __name__ == "__main__":
     loader.load(split_type="all", normalise=True, genre_filter=genre_filter, flatten=True)
 
     # create metric learner
-    metric_leaner = models.MetricLeaner(loader=loader, n_clusters=args.n_clusters, cluster_type=args.type)
+    metric_leaner = models.MetricLeaner(loader=loader, n_clusters=args.n_clusters, cluster_type=args.cluster_type)
     latent_space, y_pred, y_true = metric_leaner.get_latent(), metric_leaner.get_y_pred(), metric_leaner.get_y_true()
 
     # getting covariance matrix (if required)
     inv_covar = None
-    if args.type == "gmm":
-        logger.info(f"Using '{args.type}' - set distance metric to 'mahalanobis'")
+    if args.cluster_type == "gmm":
+        logger.info(f"Using '{args.cluster_type}' - set distance metric to 'mahalanobis'")
         covar = metric_leaner.cluster_model.covariances_[0]
         inv_covar = np.linalg.inv(covar)
     else:
-        logger.info(f"Using '{args.type}' - set distance metric to 'euclidean'")
+        logger.info(f"Using '{args.cluster_type}' - set distance metric to 'euclidean'")
 
     # get cluster stats for tree maps
     cluster_stats = utils.cluster_statistics(y_true=y_true, y_pred=y_pred, loader=loader)
@@ -189,18 +188,18 @@ if __name__ == "__main__":
     logger.info(f"Saved plot '{path}'")
 
     # show window
-    path = f"{root}/{args.type}_plot.pdf"
-    title = f"{str(args.type).upper()} cluster boundaries with {signal_processor} applied"
-    if args.type == "gmm":
+    path = f"{root}/{args.cluster_type}_plot.pdf"
+    title = f"{str(args.cluster_type).upper()} cluster boundaries with {signal_processor} applied"
+    if args.cluster_type == "gmm":
         ax, fig = interactive_plotter.interactive_gmm(gmm=metric_leaner.cluster_model, data_points=data_points, title=title, path=path)
         logger.info(f"Saved plot '{path}'")
-    elif args.type == "kmeans":
+    elif args.cluster_type == "kmeans":
         ax, fig = interactive_plotter.interactive_kmeans(kmeans=metric_leaner.cluster_model, data_points=data_points, title=title, path=path)
         logger.info(f"Saved plot '{path}'")
 
     # show the shortest path
     if args.path and len(shortest_path) > 1:
-        path = f"{root}/{args.type}_plot_shortest_path.pdf"
+        path = f"{root}/{args.cluster_type}_plot_shortest_path.pdf"
         _add_shortest_path(shortest_path=shortest_path, data_points=data_points, start_point=start_point, end_point=end_point, ax=ax, path=path)
         logger.info(f"Saved plot '{path}'")
 
