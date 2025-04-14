@@ -14,12 +14,25 @@ LATENT_DIMS = 2
 SEED = 42
 
 def _get_cluster_type(cluster_type: str, n_clusters: int):
+    """
+    Gets a K-Means of Gaussian Mixture Model
+
+    :param cluster_type: model type: 'kmeans' or 'gmm'
+    :param n_clusters: the number of clusters the model uses
+    :return: cluster model
+    """
     if cluster_type == 'kmeans':
         return KMeans(random_state=SEED, n_clusters=n_clusters)
     elif cluster_type == 'gmm':
         return GaussianMixture(n_components=n_clusters, random_state=SEED, covariance_type='full')
 
-def get_dim_model(model_type):
+def get_dim_model(model_type: str):
+    """
+    Gets dimensionality reduction model
+
+    :param model_type: the model type: 'pca', 'umap', or 'tsne'
+    :return: dimensionality reduction model
+    """
     if model_type.lower() == "pca":
         return PCA(n_components=LATENT_DIMS, random_state=SEED)
     elif model_type == "umap":
@@ -31,6 +44,14 @@ def get_dim_model(model_type):
 
 class MetricLeaner:
     def __init__(self, loader: utils.Loader, n_clusters: int, cluster_type: str):
+        """
+        Create a metric learner. This is a two-step process of 1.) reducing data into two dimensions and 2.) clustering using either K-Means or a GMM
+
+        :param loader: a data loader
+        :param n_clusters: the number of clusters
+        :param cluster_type: cluster model
+        """
+
         self.loader = loader
         self.n_clusters = n_clusters
 
@@ -92,6 +113,12 @@ class MetricLeaner:
 
 class ConvexCluster:
     def __init__(self, loader: utils.Loader):
+        """
+        Create a hierarchical representation of the data using convex clustering.
+
+        :param loader: data loader
+        """
+
         self.loader = loader
         self.dim_reducer = get_dim_model("umap")
 
@@ -101,6 +128,10 @@ class ConvexCluster:
         self.y_pred = None
 
     def _create_latent(self):
+        """
+        Creates a latent representation by transforming the data using UMAP
+        """
+
         tmp, self.y_true = self.loader.all()
         self.latent_space = self.dim_reducer.fit_transform(tmp).astype(np.float64)
         del tmp
@@ -113,6 +144,7 @@ class ConvexCluster:
         :param k: k nearest neighbours
         :return:
         """
+
         n, m = self.latent_space.shape
         dists = euclidean_distances(self.latent_space)
         np.fill_diagonal(dists, np.inf)
@@ -150,6 +182,13 @@ class ConvexCluster:
         return self.clustering_path
 
     def _create_labels(self, tol=1e-3):
+        """
+        Creates cluster labels after convex clustering
+
+        :param tol: toleraqnce
+        :return: list of labels
+        """
+
         n = self.centres.shape[0]
         labels = -np.ones(n, dtype=np.int64)
         current_label = 0

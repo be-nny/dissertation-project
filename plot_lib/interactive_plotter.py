@@ -35,6 +35,7 @@ def interactive_gmm(gmm, data_points: list[CustomPoint], title: str, path: str) 
     """
     Plot Gaussian Mixture Model with ellipses around points.
     """
+
     fig, ax = plt.subplots()
 
     x = [p.x for p in data_points]
@@ -75,6 +76,7 @@ def interactive_kmeans(kmeans, data_points: list[CustomPoint], title: str, path:
     :param path: path to save
     :param h: step size for the grid used to create the mesh for plotting the decision boundaries
     """
+
     fig, ax = plt.subplots()
 
     x = np.array([p.x for p in data_points])
@@ -133,6 +135,7 @@ def _show_nearest_neighbours(event, fig, ax, data_points, path):
     :param ax: axes
     :param data_points: plotted data points
     """
+
     ind = event.ind
     for i in ind:
         for neighbour_data in data_points[i].nearest_neighbours:

@@ -1,5 +1,8 @@
 import argparse
 import os.path
+
+from tqdm import tqdm
+
 import model
 import logger
 

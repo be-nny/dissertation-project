@@ -27,6 +27,13 @@ parser.add_argument("-g", "--genres", help="Takes a comma-seperated string of ge
 parser.add_argument("-n", "--n_clusters", type=int, help="The number of clusters to find")
 
 def _prominent_genres(cluster_stats: dict):
+    """
+    Find the most prominent genre in each cluster
+
+    :param cluster_stats: cluster statistics
+    :return: dict of most prominent genres as 'cluster_n':'genre'
+    """
+
     prominent_cluster_genre = {}
     for cluster_key, values in cluster_stats.items():
         sort_by_value = dict(sorted(values.items(), key=lambda item: item[1]))
@@ -36,6 +43,17 @@ def _prominent_genres(cluster_stats: dict):
     return prominent_cluster_genre
 
 def _add_shortest_path(shortest_path, data_points, start_point, end_point, path, ax):
+    """
+    Add the shortest between two points in the latent space
+
+    :param shortest_path: shortest path between the points
+    :param data_points: custom data ponts
+    :param start_point: start point
+    :param end_point: end point
+    :param path: path to save
+    :param ax: figure to plot to
+    """
+
     padding = 3
     ax.plot(shortest_path[:, 0], shortest_path[:, 1], color="pink", label="Shortest path")
 
@@ -63,7 +81,21 @@ def _add_shortest_path(shortest_path, data_points, start_point, end_point, path,
     plt.savefig(path, bbox_inches='tight')
     plt.autoscale()
 
-def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: str, segment_duration: int, sample_rate: int, fig: plt.Figure, ax: plt.Axes, path: str):
+def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: str, segment_duration: int, sample_rate: int, fig: plt.Figure, ax: plt.Axes, path: str, overlap_ratio: float = 0.3):
+    """
+    Fit a new song to show its evolution. If segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window will be included in the next window
+
+    :param new_file_path: path to new song
+    :param model: the clustering model
+    :param signal_func_name: signal function to apply
+    :param segment_duration: segment duration
+    :param sample_rate: sample rate
+    :param fig: figure
+    :param ax: axis
+    :param overlap_ratio: overlap ratio
+    :param path: path to save
+    """
+
     file_name = os.path.basename(new_file_path).strip().replace("_", " ")
 
     signal_func = sp.get_type(signal_func_name)
@@ -71,7 +103,6 @@ def _fit_new(new_file_path: str, model: models.MetricLeaner, signal_func_name: s
 
     # if segment duration is 30 seconds and overlap_ratio is set to 0.1, then 27 seconds of the previous window
     # will be included in the next window
-    overlap_ratio = 0.3
     signal_func_width = segment_data.shape[-1]
 
     stride = int(signal_func_width * overlap_ratio)

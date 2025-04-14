@@ -13,6 +13,12 @@ from scipy.spatial.distance import mahalanobis, euclidean
 
 class ReceiptReader:
     def __init__(self, filename):
+        """
+        Read the contents of a receipt file, that is generated after preprocessing=
+
+        :param filename: receipt name
+        """
+
         self.filename = filename
         self.genres = []
         self.signal_processor = []
@@ -51,6 +57,16 @@ def _normalise(signal_data: np.array) -> np.array:
 
 class Loader:
     def __init__(self, uuid: str, out: str, logger, batch_size: int = 512, verbose: bool = True):
+        """
+        Dataloader object for reading a preprocessed dataset
+
+        :param uuid: uuid name of the preprocessed dataset
+        :param out: output directory
+        :param logger: logger
+        :param batch_size: the batch size to read in
+        :param verbose: verbose flag
+        """
+
         self.uuid = uuid
         self.root = os.path.join(out, self.uuid)
         self.logger = logger
@@ -85,6 +101,7 @@ class Loader:
         :param split_type: type of split (test/train)
         :return: a data split
         """
+
         split = []
         split_path = os.path.join(self.root, split_type)
         for genre_dir in os.listdir(split_path):
@@ -112,6 +129,7 @@ class Loader:
         :param flatten: flag to flatten the dataa
         :return: tensorflow data loader
         """
+
         self.split_type = split_type
         if self.verbose:
             self.logger.info(f"'normalise' flag set to '{normalise}'")
@@ -143,6 +161,12 @@ class Loader:
         return self.dataloader
 
     def all(self):
+        """
+        Get all flattened data and labels
+
+        :return: flattened tuple of all data and labels
+        """
+
         flattened_data = []
         flattened_y_true = []
         for x, y in self.dataloader:
@@ -160,6 +184,7 @@ class Loader:
         :param labels: string labels
         :return: numeric values
         """
+
         return self.label_encoder.transform(labels)
 
     def decode_label(self, encoded_labels):
@@ -169,6 +194,7 @@ class Loader:
         :param encoded_labels: 1-D array of numeric labels
         :return: string labels
         """
+
         return self.label_encoder.inverse_transform(encoded_labels)
 
     def _get_data_split(self, split_type, normalise: bool, genre_filter: list):
@@ -369,6 +395,14 @@ def correlation(latent_space: np.ndarray, y_true: np.ndarray, covar: np.ndarray,
     return neighbours_true, neighbours_pred
 
 def correlation_metrics(y_true, y_pred):
+    """
+    Get f1 score, precision, recall, and accuracy of y true and y pred labels
+
+    :param y_true: true labels
+    :param y_pred: predicted labels
+    :return: f1 score, precision, recall, accuracy
+    """
+
     f1 = f1_score(y_true, y_pred, average='macro')
     precision = precision_score(y_true, y_pred, average='macro')
     acc = accuracy_score(y_true, y_pred)

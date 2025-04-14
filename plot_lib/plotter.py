@@ -190,7 +190,17 @@ def plot_2D(latent_space: np.ndarray, y_true: np.ndarray, path: str, title: str,
     plt.title(title)
     plt.savefig(path, bbox_inches='tight')
 
-def plot_correlation_accuracy(latent_space, y_true, covariance_mat, label, max_n_neighbours: int = 100):
+def plot_correlation_accuracy(latent_space, y_true, covariance_mat, label, max_n_neighbours: int = 100) -> None:
+    """
+    Plot the correlation accuracy as a line graph
+
+    :param latent_space: the latent space
+    :param y_true: true labels
+    :param covariance_mat: covariance matrice, can be None
+    :param label: legend label
+    :param max_n_neighbours: the maximum number of neighbours
+    """
+
     accuracy_scores = []
     for n in range(1, max_n_neighbours + 1):
         t_corr, p_corr = utils.correlation(latent_space=latent_space, y_true=y_true, covar=covariance_mat, n_neighbours=n)
@@ -203,6 +213,14 @@ def plot_correlation_accuracy(latent_space, y_true, covariance_mat, label, max_n
     plt.legend()
 
 def plot_shannon_entropy(n_clusters, avg_shannon_vals, label: str) -> None:
+    """
+    Plot the shannon entropy of the total cluster space
+
+    :param n_clusters: list of total number of clusters
+    :param avg_shannon_vals: list of average shannon values
+    :param label: legend label
+    """
+
     plt.plot(n_clusters, avg_shannon_vals, label=label, alpha=0.7)
     plt.xticks(ticks=n_clusters, labels=[str(int(x)) for x in n_clusters])
     plt.xlabel("Number of Clusters")
@@ -210,6 +228,16 @@ def plot_shannon_entropy(n_clusters, avg_shannon_vals, label: str) -> None:
     plt.legend()
 
 def plot_correlation_conf_mat(cf_matrix, class_labels, n_neighbours, path, **kwargs) -> None:
+    """
+    Plot the confusion matrix
+
+    :param cf_matrix: confusion matrix
+    :param class_labels: class labels
+    :param n_neighbours: number of nearest neighbours
+    :param path: path to save
+    :param kwargs: kwargs corresponding to 'f1_score', 'precision', 'recall', and 'accuracy'
+    """
+
     f1 = kwargs["f1_score"]
     precision = kwargs["precision"]
     recall = kwargs["recall"]
@@ -224,6 +252,16 @@ def plot_correlation_conf_mat(cf_matrix, class_labels, n_neighbours, path, **kwa
     plt.close()
 
 def plot_convex_clusters(latent_space, u_path, loader, y_true, path):
+    """
+    Plot the convex clustering heirarchy
+
+    :param latent_space: latent space
+    :param u_path: cluster centre path
+    :param loader: data loader
+    :param y_true: true labels
+    :param path: path to save
+    """
+
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111)
 
@@ -251,6 +289,15 @@ def plot_convex_clusters(latent_space, u_path, loader, y_true, path):
     plt.close()
 
 def plot_classifier_scores(data: dict, classifier_labels: list, path: str) -> None:
+    """
+    Plot classifier scores on a bar chart
+
+    :param data: score data
+    :param classifier_labels: classifier names
+    :param path: path to save
+    :return:
+    """
+
     x = np.arange(len(classifier_labels))
     width = 0.1
     multiplier = 0
