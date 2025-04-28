@@ -25,7 +25,7 @@ matplotlib.use('TkAgg')
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool (MGAT) - Analyis', formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool (MGAT) - Analysis', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="config file")
 parser.add_argument("-u", "--uuid", help="this takes a comma seperated list of uuids to load (e.g., 19ee37,58bd65)")
 parser.add_argument("-n", "--n_clusters", type=int, help="number of clusters")

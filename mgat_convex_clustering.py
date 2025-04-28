@@ -13,7 +13,7 @@ from utils import get_genre_filter
 
 matplotlib.use('TkAgg')
 
-parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool - CONVEX CLUSTER', formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool - Convex Clustering', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-c", "--config", required=True, help="Config file")
 parser.add_argument("-u", "--uuid", help="UUID of the preprocessed dataset to use, or a list of comma seperated uuid's")
 parser.add_argument("-i", "--info", action="store_true", help="Returns a list of available datasets to use")

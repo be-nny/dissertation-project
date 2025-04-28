@@ -6,7 +6,7 @@ from preprocessor import utils as pu
 from preprocessor.signal_processor import get_type, get_all_types
 
 # arguments parser
-parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool (MGAT) - PREPROCESSOR', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
+parser = argparse.ArgumentParser(prog='Music Genre Analysis Tool (MGAT) - Preprocessing', formatter_class=argparse.RawDescriptionHelpFormatter, description="Preprocess Audio Dataset")
 parser.add_argument("-c", "--config", required=True, help="config file")
 parser.add_argument("-s", "--signal_processor", required=True, choices=get_all_types(), help="the signal processor to apply to the raw audio")
 
